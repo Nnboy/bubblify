@@ -87,6 +87,9 @@ class BubblifyApp:
         self.transform_control: Optional[viser.TransformControlsHandle] = None
         self.radius_gizmo: Optional[viser.TransformControlsHandle] = None
 
+        # Box resize gizmos (one for each axis: X, Y, Z)
+        self.box_resize_gizmos: Dict[str, viser.TransformControlsHandle] = {}
+
         # GUI control references for syncing
         self._link_dropdown = None
         self._current_link_dropdown = None
@@ -401,6 +404,8 @@ class BubblifyApp:
                     self.current_sphere_id = None
 
                 self._update_transform_control()
+                self._update_radius_gizmo()
+                self._update_box_resize_gizmos()
                 self._update_geometry_properties_ui()
                 self._update_sphere_opacities()
                 self._update_mesh_visibility()
@@ -430,6 +435,8 @@ class BubblifyApp:
                             self._update_mesh_visibility()
 
                     self._update_transform_control()
+                    self._update_radius_gizmo()
+                    self._update_box_resize_gizmos()
                     self._update_geometry_properties_ui()
                     self._update_sphere_opacities()
                 else:
@@ -493,6 +500,7 @@ class BubblifyApp:
                 # Directly call the control update methods to show gizmo immediately
                 self._update_transform_control()
                 self._update_radius_gizmo()
+                self._update_box_resize_gizmos()
                 self._update_geometry_properties_ui()
                 self._update_sphere_opacities()
 
@@ -548,6 +556,7 @@ class BubblifyApp:
                     geometry.color = tuple(int(c) for c in geometry_color.value)
                     self._update_geometry_visualization(geometry)
                     self._update_radius_gizmo()
+                    self._update_box_resize_gizmos()
 
             # Keep backward compatibility alias
             update_sphere_properties = update_geometry_properties
@@ -812,6 +821,7 @@ class BubblifyApp:
             # Update visuals and UI
             self._update_transform_control()
             self._update_radius_gizmo()
+            self._update_box_resize_gizmos()
             self._update_sphere_opacities()
             self._update_mesh_visibility()
             self._update_geometry_properties_ui()
@@ -892,6 +902,7 @@ class BubblifyApp:
                             )
                         self._update_geometry_visualization(current_sphere)
                         self._update_radius_gizmo()
+                        self._update_box_resize_gizmos()
                         # Update UI to show current rotation
                         self._update_geometry_properties_ui()
 
@@ -901,12 +912,23 @@ class BubblifyApp:
             self.transform_control.remove()
             self.transform_control = None
         self._remove_radius_gizmo()
+        self._remove_box_resize_gizmos()
 
     def _remove_radius_gizmo(self):
         """Remove the current radius gizmo."""
         if self.radius_gizmo is not None:
             self.radius_gizmo.remove()
             self.radius_gizmo = None
+
+    def _remove_box_resize_gizmos(self):
+        """Remove all box resize gizmos."""
+        for gizmo in self.box_resize_gizmos.values():
+            if gizmo is not None:
+                try:
+                    gizmo.remove()
+                except Exception:
+                    pass
+        self.box_resize_gizmos.clear()
 
     def _update_radius_gizmo(self):
         """Update radius gizmo for the currently selected sphere."""
@@ -989,6 +1011,189 @@ class BubblifyApp:
                 self._updating_sphere_ui = True
                 self._sphere_radius_slider.value = new_radius
                 self._updating_sphere_ui = False
+
+    def _update_box_resize_gizmos(self):
+        """Update box resize gizmos for the currently selected box geometry."""
+        # Remove any previous gizmos
+        self._remove_box_resize_gizmos()
+
+        if (
+            self.current_geometry_id is None
+            or self.current_geometry_id not in self.geometry_store.by_id
+        ):
+            return
+
+        geometry = self.geometry_store.by_id[self.current_geometry_id]
+
+        # Only create gizmos for box geometries
+        if geometry.geometry_type != "box":
+            return
+
+        parent_frame = self.geometry_store.group_nodes.get(geometry.link)
+        if parent_frame is None:
+            return
+
+        import math
+        from viser import transforms as tf
+
+        # Box dimensions
+        length, width, height = geometry.size
+        center_x, center_y, center_z = geometry.local_xyz
+
+        # Create gizmos for each axis (X, Y, Z)
+        # 简化配置，不使用复杂的旋转，让每个gizmo在其对应的轴上自由移动
+        axes_info = [
+            {
+                "name": "x_pos",
+                "axis": (1, 0, 0),
+                "color": (255, 100, 100),
+                "position": (center_x + length / 2, center_y, center_z),
+                "active_axes": (True, False, False),  # 只允许X轴移动
+                "rotation": tf.SO3.identity(),
+            },
+            {
+                "name": "x_neg",
+                "axis": (-1, 0, 0),
+                "color": (200, 80, 80),  # 稍微不同的颜色区分
+                "position": (center_x - length / 2, center_y, center_z),
+                "active_axes": (True, False, False),  # 只允许X轴移动
+                "rotation": tf.SO3.identity(),
+            },
+            {
+                "name": "y_pos",
+                "axis": (0, 1, 0),
+                "color": (100, 255, 100),
+                "position": (center_x, center_y + width / 2, center_z),
+                "active_axes": (False, True, False),  # 只允许Y轴移动
+                "rotation": tf.SO3.identity(),
+            },
+            {
+                "name": "y_neg",
+                "axis": (0, -1, 0),
+                "color": (80, 200, 80),  # 稍微不同的颜色区分
+                "position": (center_x, center_y - width / 2, center_z),
+                "active_axes": (False, True, False),  # 只允许Y轴移动
+                "rotation": tf.SO3.identity(),
+            },
+            {
+                "name": "z_pos",
+                "axis": (0, 0, 1),
+                "color": (100, 100, 255),
+                "position": (center_x, center_y, center_z + height / 2),
+                "active_axes": (False, False, True),  # 只允许Z轴移动
+                "rotation": tf.SO3.identity(),
+            },
+            {
+                "name": "z_neg",
+                "axis": (0, 0, -1),
+                "color": (80, 80, 200),  # 稍微不同的颜色区分
+                "position": (center_x, center_y, center_z - height / 2),
+                "active_axes": (False, False, True),  # 只允许Z轴移动
+                "rotation": tf.SO3.identity(),
+            },
+        ]
+
+        for axis_info in axes_info:
+            gizmo_name = (
+                f"{parent_frame.name}/box_resize_{geometry.id}_{axis_info['name']}"
+            )
+
+            gizmo = self.server.scene.add_transform_controls(
+                gizmo_name,
+                scale=0.3,  # Smaller than main transform control
+                active_axes=axis_info["active_axes"],
+                disable_sliders=True,
+                disable_rotations=True,
+                wxyz=axis_info["rotation"].wxyz,
+                position=axis_info["position"],
+            )
+
+            # Store the gizmo and setup callback
+            self.box_resize_gizmos[axis_info["name"]] = gizmo
+
+            # Create callback for this specific gizmo
+            self._setup_box_resize_callback(gizmo, axis_info["name"], axis_info["axis"])
+
+    def _setup_box_resize_callback(self, gizmo, axis_name, axis_direction):
+        """Setup callback for a specific box resize gizmo."""
+
+        @gizmo.on_update
+        def _(_):
+            if (
+                self.current_geometry_id is None
+                or self.current_geometry_id not in self.geometry_store.by_id
+            ):
+                return
+
+            geometry = self.geometry_store.by_id[self.current_geometry_id]
+            if geometry.geometry_type != "box":
+                return
+
+            # Get current gizmo position
+            gizmo_pos = gizmo.position
+            center = geometry.local_xyz
+            old_size = geometry.size
+
+            # Calculate new size based on gizmo position
+            new_size = list(geometry.size)
+
+            if "x" in axis_name:
+                # X-axis resize
+                distance = abs(gizmo_pos[0] - center[0])
+                new_size[0] = max(0.01, distance * 2)  # Minimum size 1cm
+            elif "y" in axis_name:
+                # Y-axis resize
+                distance = abs(gizmo_pos[1] - center[1])
+                new_size[1] = max(0.01, distance * 2)  # Minimum size 1cm
+            elif "z" in axis_name:
+                # Z-axis resize
+                distance = abs(gizmo_pos[2] - center[2])
+                new_size[2] = max(0.01, distance * 2)  # Minimum size 1cm
+
+            # Update geometry size
+            geometry.size = tuple(new_size)
+
+            # Update visualization
+            self._update_geometry_visualization(geometry)
+
+            # Update other gizmos positions (but avoid infinite recursion)
+            self._update_other_box_gizmos(axis_name, geometry)
+
+            # Update UI sliders without triggering callbacks
+            if self._box_size_sliders:
+                self._updating_geometry_ui = True
+                self._box_size_sliders[0].value = new_size[0]  # length
+                self._box_size_sliders[1].value = new_size[1]  # width
+                self._box_size_sliders[2].value = new_size[2]  # height
+                self._updating_geometry_ui = False
+
+    def _update_other_box_gizmos(self, changed_axis_name, geometry):
+        """Update positions of other box gizmos when one is moved."""
+        if geometry.geometry_type != "box":
+            return
+
+        import math
+        from viser import transforms as tf
+
+        length, width, height = geometry.size
+        center_x, center_y, center_z = geometry.local_xyz
+
+        # Update positions of gizmos that weren't just moved
+        position_updates = {
+            "x_pos": (center_x + length / 2, center_y, center_z),
+            "x_neg": (center_x - length / 2, center_y, center_z),
+            "y_pos": (center_x, center_y + width / 2, center_z),
+            "y_neg": (center_x, center_y - width / 2, center_z),
+            "z_pos": (center_x, center_y, center_z + height / 2),
+            "z_neg": (center_x, center_y, center_z - height / 2),
+        }
+
+        for axis_name, gizmo in self.box_resize_gizmos.items():
+            if axis_name != changed_axis_name and gizmo is not None:
+                try:
+                    gizmo.position = position_updates[axis_name]
+                except Exception:
+                    pass  # Ignore errors if gizmo is being removed
 
     def _update_geometry_properties_ui(self):
         """Update the geometry property UI controls to reflect the currently selected geometry."""
