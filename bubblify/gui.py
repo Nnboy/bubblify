@@ -881,6 +881,8 @@ class BubblifyApp:
                         if not disable_rotations
                         else (1.0, 0.0, 0.0, 0.0)
                     ),
+                    depth_test=True,  # 主控制器保持深度测试
+                    opacity=1.0,  # 主控制器保持完全不透明
                 )
 
                 # Set up callback for transform updates
@@ -1034,78 +1036,78 @@ class BubblifyApp:
             return
 
         import math
+        import numpy as np
         from viser import transforms as tf
 
         # Box dimensions
         length, width, height = geometry.size
         center_x, center_y, center_z = geometry.local_xyz
 
-        # Create gizmos for each axis (X, Y, Z)
-        # 简化配置，不使用复杂的旋转，让每个gizmo在其对应的轴上自由移动
+        # Create gizmos for each axis (X, Y, Z) - 简化版本，暂时不考虑box旋转
         axes_info = [
-            {
-                "name": "x_pos",
-                "axis": (1, 0, 0),
-                "color": (255, 100, 100),
-                "position": (center_x + length / 2, center_y, center_z),
-                "active_axes": (True, False, False),  # 只允许X轴移动
-                "rotation": tf.SO3.identity(),
-            },
             {
                 "name": "x_neg",
                 "axis": (-1, 0, 0),
-                "color": (200, 80, 80),  # 稍微不同的颜色区分
-                "position": (center_x - length / 2, center_y, center_z),
-                "active_axes": (True, False, False),  # 只允许X轴移动
-                "rotation": tf.SO3.identity(),
-            },
-            {
-                "name": "y_pos",
-                "axis": (0, 1, 0),
-                "color": (100, 255, 100),
-                "position": (center_x, center_y + width / 2, center_z),
-                "active_axes": (False, True, False),  # 只允许Y轴移动
-                "rotation": tf.SO3.identity(),
+                "color": (200, 80, 80),
+                "position": (
+                    center_x - length / 2,
+                    center_y,
+                    center_z,
+                ),  # 直接使用世界坐标
+                "active_axes": (True, False, False),
+                "rotation": tf.SO3.from_y_radians(
+                    math.pi
+                ),  # 简单的旋转，箭头指向相反方向
             },
             {
                 "name": "y_neg",
                 "axis": (0, -1, 0),
-                "color": (80, 200, 80),  # 稍微不同的颜色区分
-                "position": (center_x, center_y - width / 2, center_z),
-                "active_axes": (False, True, False),  # 只允许Y轴移动
-                "rotation": tf.SO3.identity(),
-            },
-            {
-                "name": "z_pos",
-                "axis": (0, 0, 1),
-                "color": (100, 100, 255),
-                "position": (center_x, center_y, center_z + height / 2),
-                "active_axes": (False, False, True),  # 只允许Z轴移动
-                "rotation": tf.SO3.identity(),
+                "color": (80, 200, 80),
+                "position": (
+                    center_x,
+                    center_y - width / 2,
+                    center_z,
+                ),  # 直接使用世界坐标
+                "active_axes": (False, True, False),
+                "rotation": tf.SO3.from_x_radians(
+                    math.pi
+                ),  # 简单的旋转，箭头指向相反方向
             },
             {
                 "name": "z_neg",
                 "axis": (0, 0, -1),
-                "color": (80, 80, 200),  # 稍微不同的颜色区分
-                "position": (center_x, center_y, center_z - height / 2),
-                "active_axes": (False, False, True),  # 只允许Z轴移动
-                "rotation": tf.SO3.identity(),
+                "color": (80, 80, 200),
+                "position": (
+                    center_x,
+                    center_y,
+                    center_z - height / 2,
+                ),  # 直接使用世界坐标
+                "active_axes": (False, False, True),
+                "rotation": tf.SO3.from_x_radians(
+                    math.pi
+                ),  # 简单的旋转，箭头指向相反方向
             },
         ]
 
         for axis_info in axes_info:
+            # 直接使用计算好的位置和旋转
+            world_position = axis_info["position"]
+            gizmo_rotation = axis_info["rotation"]
+
             gizmo_name = (
                 f"{parent_frame.name}/box_resize_{geometry.id}_{axis_info['name']}"
             )
 
             gizmo = self.server.scene.add_transform_controls(
                 gizmo_name,
-                scale=0.3,  # Smaller than main transform control
+                scale=0.2,
+                line_width=20.0,
                 active_axes=axis_info["active_axes"],
                 disable_sliders=True,
                 disable_rotations=True,
-                wxyz=axis_info["rotation"].wxyz,
-                position=axis_info["position"],
+                wxyz=gizmo_rotation.wxyz,
+                position=world_position,
+                opacity=0.8,
             )
 
             # Store the gizmo and setup callback
@@ -1134,7 +1136,7 @@ class BubblifyApp:
             center = geometry.local_xyz
             old_size = geometry.size
 
-            # Calculate new size based on gizmo position
+            # Calculate new size based on gizmo position and axis direction
             new_size = list(geometry.size)
 
             if "x" in axis_name:
@@ -1173,18 +1175,16 @@ class BubblifyApp:
             return
 
         import math
+        import numpy as np
         from viser import transforms as tf
 
         length, width, height = geometry.size
         center_x, center_y, center_z = geometry.local_xyz
 
-        # Update positions of gizmos that weren't just moved
+        # Update positions of gizmos that weren't just moved - 简化版本
         position_updates = {
-            "x_pos": (center_x + length / 2, center_y, center_z),
             "x_neg": (center_x - length / 2, center_y, center_z),
-            "y_pos": (center_x, center_y + width / 2, center_z),
             "y_neg": (center_x, center_y - width / 2, center_z),
-            "z_pos": (center_x, center_y, center_z + height / 2),
             "z_neg": (center_x, center_y, center_z - height / 2),
         }
 
@@ -1305,7 +1305,7 @@ class BubblifyApp:
         """Sync sphere dropdown to reflect the currently selected sphere (backward compatibility)."""
         return self._sync_geometry_selection()
 
-    def _get_sphere_opacity(self, sphere: Sphere) -> float:
+    def _get_sphere_opacity(self, sphere: Geometry) -> float:
         """Get the appropriate opacity for a sphere based on current selection state."""
         if sphere.id == self.current_sphere_id:
             return self.selected_sphere_opacity
