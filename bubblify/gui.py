@@ -75,13 +75,9 @@ class BubblifyApp:
 
         # Geometry management
         self.geometry_store = GeometryStore()
-        # Keep backward compatibility alias
-        self.sphere_store = self.geometry_store
 
         # GUI state
         self.current_geometry_id: Optional[int] = None
-        # Keep backward compatibility alias
-        self.current_sphere_id: Optional[int] = None
         self.current_link: str = ""
         self.joint_sliders: List[viser.GuiInputHandle[float]] = []
         self.transform_control: Optional[viser.TransformControlsHandle] = None
@@ -103,31 +99,27 @@ class BubblifyApp:
         self._cylinder_height_slider = None
         self._geometry_color_input = None
 
-        # Keep backward compatibility aliases
-        self._sphere_dropdown = None
-        self._sphere_color_input = None
-
         # Flag to prevent recursive updates
         self._updating_geometry_ui = False
-        # Keep backward compatibility alias
-        self._updating_sphere_ui = False
 
         # Visibility settings
         self.show_selected_link: bool = True
         self.show_other_links: bool = True
 
-        # Sphere opacity settings
-        self.selected_sphere_opacity: float = 1.0
-        self.unselected_spheres_opacity: float = 0.5
-        self.other_links_spheres_opacity: float = 0.2
+        # Geometry opacity settings for visual focus system
+        self.selected_geometry_opacity: float = 1.0
+        self.unselected_geometries_opacity: float = 0.5
+        self.other_links_geometries_opacity: float = 0.2
 
-        # Create sphere root frame
-        self.spheres_root = self.server.scene.add_frame("/spheres", show_axes=False)
+        # Create geometry root frame
+        self.geometries_root = self.server.scene.add_frame(
+            "/geometries", show_axes=False
+        )
 
         # Setup GUI
         self._setup_robot_controls()
         self._setup_visibility_controls()
-        self._setup_sphere_controls()
+        self._setup_geometry_controls()
         self._setup_export_controls()
 
         # Add a grid for reference
@@ -141,7 +133,7 @@ class BubblifyApp:
             self._load_spherization_yaml(spherization_yml)
 
         print(f"🎯 Bubblify server running at http://localhost:{port}")
-        print("Use the GUI controls to add and edit collision spheres!")
+        print("Use the GUI controls to add and edit collision geometries!")
 
     def _setup_robot_controls(self):
         """Setup robot configuration and visibility controls."""
@@ -207,27 +199,27 @@ class BubblifyApp:
                 "Show Other Links", initial_value=self.show_other_links
             )
 
-            # Sphere opacity controls with clearer names
-            selected_sphere_opacity = self.server.gui.add_slider(
-                "Current Sphere",
+            # Geometry opacity controls for visual focus system
+            selected_geometry_opacity = self.server.gui.add_slider(
+                "Current Geometry",
                 min=0.0,
                 max=1.0,
                 step=0.1,
-                initial_value=self.selected_sphere_opacity,
+                initial_value=self.selected_geometry_opacity,
             )
-            unselected_spheres_opacity = self.server.gui.add_slider(
-                "Other Spheres (Same Link)",
+            unselected_geometries_opacity = self.server.gui.add_slider(
+                "Other Geometries (Same Link)",
                 min=0.0,
                 max=1.0,
                 step=0.1,
-                initial_value=self.unselected_spheres_opacity,
+                initial_value=self.unselected_geometries_opacity,
             )
-            other_links_spheres_opacity = self.server.gui.add_slider(
-                "Spheres (Other Links)",
+            other_links_geometries_opacity = self.server.gui.add_slider(
+                "Geometries (Other Links)",
                 min=0.0,
                 max=1.0,
                 step=0.1,
-                initial_value=self.other_links_spheres_opacity,
+                initial_value=self.other_links_geometries_opacity,
             )
 
             # Store references for updates
@@ -252,22 +244,24 @@ class BubblifyApp:
                 self.show_other_links = show_other_links_cb.value
                 self._update_mesh_visibility()
 
-            @selected_sphere_opacity.on_update
+            @selected_geometry_opacity.on_update
             def _(_):
-                self.selected_sphere_opacity = selected_sphere_opacity.value
-                self._update_sphere_opacities()
+                self.selected_geometry_opacity = selected_geometry_opacity.value
+                self._update_geometry_opacities()
 
-            @unselected_spheres_opacity.on_update
+            @unselected_geometries_opacity.on_update
             def _(_):
-                self.unselected_spheres_opacity = unselected_spheres_opacity.value
-                self._update_sphere_opacities()
+                self.unselected_geometries_opacity = unselected_geometries_opacity.value
+                self._update_geometry_opacities()
 
-            @other_links_spheres_opacity.on_update
+            @other_links_geometries_opacity.on_update
             def _(_):
-                self.other_links_spheres_opacity = other_links_spheres_opacity.value
-                self._update_sphere_opacities()
+                self.other_links_geometries_opacity = (
+                    other_links_geometries_opacity.value
+                )
+                self._update_geometry_opacities()
 
-    def _setup_sphere_controls(self):
+    def _setup_geometry_controls(self):
         """Setup geometry creation and editing controls."""
         with self.server.gui.add_folder("🔶 Geometry Editor"):
             # Get links for dropdown
@@ -295,8 +289,6 @@ class BubblifyApp:
                 "Geometry", options=["None"], initial_value="None"
             )
             self._geometry_dropdown = geometry_dropdown  # Store reference
-            # Keep backward compatibility alias
-            self._sphere_dropdown = geometry_dropdown
 
             # Geometry creation and deletion
             add_geometry_btn = self.server.gui.add_button("➕ Add Geometry")
@@ -357,8 +349,6 @@ class BubblifyApp:
                 "Color", initial_value=(255, 180, 60)
             )
             self._geometry_color_input = geometry_color
-            # Keep backward compatibility alias
-            self._sphere_color_input = geometry_color
 
             # Rotation properties
             with self.server.gui.add_folder(
@@ -402,31 +392,24 @@ class BubblifyApp:
                     # Update both dropdown and current_geometry_id
                     geometry_dropdown.value = f"{geometry_to_select.geometry_type.title()} {geometry_to_select.id}"
                     self.current_geometry_id = geometry_to_select.id
-                    # Keep backward compatibility
-                    self.current_sphere_id = geometry_to_select.id
                 else:
                     geometry_dropdown.options = ["None"]
                     geometry_dropdown.value = "None"
                     self.current_geometry_id = None
-                    self.current_sphere_id = None
 
                 self._update_transform_control()
                 self._update_radius_gizmo()
                 self._update_box_resize_gizmos()
                 self._update_cylinder_height_gizmos()
                 self._update_geometry_properties_ui()
-                self._update_sphere_opacities()
+                self._update_geometry_opacities()
                 self._update_mesh_visibility()
-
-            # Keep backward compatibility alias
-            update_sphere_dropdown = update_geometry_dropdown
 
             def update_selected_geometry():
                 """Update selected geometry ID from dropdown and switch link context."""
                 if geometry_dropdown.value != "None":
                     geometry_id = int(geometry_dropdown.value.split()[-1])
                     self.current_geometry_id = geometry_id
-                    self.current_sphere_id = geometry_id  # Backward compatibility
 
                     # Get the geometry and switch to its link
                     if geometry_id in self.geometry_store.by_id:
@@ -443,14 +426,10 @@ class BubblifyApp:
                     self._update_box_resize_gizmos()
                     self._update_cylinder_height_gizmos()
                     self._update_geometry_properties_ui()
-                    self._update_sphere_opacities()
+                    self._update_geometry_opacities()
                 else:
                     self.current_geometry_id = None
-                    self.current_sphere_id = None
                     self._remove_transform_control()
-
-            # Keep backward compatibility alias
-            update_selected_sphere = update_selected_geometry
 
             @link_dropdown.on_update
             def _(_):
@@ -497,7 +476,6 @@ class BubblifyApp:
 
                 # Select the new geometry as current
                 self.current_geometry_id = geometry.id
-                self.current_sphere_id = geometry.id  # Backward compatibility
 
                 # Update dropdown and controls immediately
                 update_geometry_dropdown()
@@ -508,7 +486,7 @@ class BubblifyApp:
                 self._update_box_resize_gizmos()
                 self._update_cylinder_height_gizmos()
                 self._update_geometry_properties_ui()
-                self._update_sphere_opacities()
+                self._update_geometry_opacities()
 
             @delete_geometry_btn.on_click
             def _(_):
@@ -516,14 +494,13 @@ class BubblifyApp:
                 if self.current_geometry_id is not None:
                     self.geometry_store.remove(self.current_geometry_id)
                     self.current_geometry_id = None
-                    self.current_sphere_id = None
                     self._remove_transform_control()
                     update_geometry_dropdown()
 
             def update_geometry_properties():
                 """Update geometry properties from UI."""
                 # Skip update if we're currently updating the UI to prevent recursive changes
-                if self._updating_geometry_ui or self._updating_sphere_ui:
+                if self._updating_geometry_ui:
                     return
 
                 if (
@@ -566,9 +543,6 @@ class BubblifyApp:
                     self._update_box_resize_gizmos()
                     self._update_cylinder_height_gizmos()
 
-            # Keep backward compatibility alias
-            update_sphere_properties = update_geometry_properties
-
             # Connect all property sliders to update function
             sphere_radius.on_update(lambda _: update_geometry_properties())
             box_length.on_update(lambda _: update_geometry_properties())
@@ -587,7 +561,7 @@ class BubblifyApp:
             update_geometry_dropdown()
 
             # Set up initial opacity state
-            self._update_sphere_opacities()
+            self._update_geometry_opacities()
 
     def _setup_export_controls(self):
         """Setup export functionality."""
@@ -747,7 +721,7 @@ class BubblifyApp:
         parent_frame = self.geometry_store.group_nodes[geometry.link]
 
         # Create geometry visualization with appropriate opacity
-        opacity = self._get_sphere_opacity(geometry)
+        opacity = self._get_geometry_opacity(geometry)
 
         # Create different geometry types
         if geometry.geometry_type == "sphere":
@@ -833,7 +807,6 @@ class BubblifyApp:
         def _(_):
             # Set geometry ID FIRST, before any other updates
             self.current_geometry_id = geometry.id
-            self.current_sphere_id = geometry.id  # Backward compatibility
             old_link = self.current_link
             self.current_link = geometry.link
 
@@ -861,14 +834,9 @@ class BubblifyApp:
             self._update_radius_gizmo()
             self._update_box_resize_gizmos()
             self._update_cylinder_height_gizmos()
-            self._update_sphere_opacities()
+            self._update_geometry_opacities()
             self._update_mesh_visibility()
             self._update_geometry_properties_ui()
-
-    # Keep backward compatibility alias
-    def _create_sphere_visualization(self, sphere: Geometry):
-        """Create or update the 3D visualization for a sphere (backward compatibility)."""
-        return self._create_geometry_visualization(sphere)
 
     def _update_geometry_visualization(self, geometry: Geometry):
         """Update existing geometry visualization."""
@@ -886,37 +854,32 @@ class BubblifyApp:
         # Recreate with new properties
         self._create_geometry_visualization(geometry)
 
-    # Keep backward compatibility alias
-    def _update_sphere_visualization(self, sphere: Geometry):
-        """Update existing sphere visualization (backward compatibility)."""
-        return self._update_geometry_visualization(sphere)
-
     def _update_transform_control(self):
-        """Update transform control for the currently selected sphere."""
+        """Update transform control for the currently selected geometry."""
         if (
-            self.current_sphere_id is not None
-            and self.current_sphere_id in self.sphere_store.by_id
+            self.current_geometry_id is not None
+            and self.current_geometry_id in self.geometry_store.by_id
         ):
-            sphere = self.sphere_store.by_id[self.current_sphere_id]
+            geometry = self.geometry_store.by_id[self.current_geometry_id]
 
             # Remove existing transform control
             self._remove_transform_control()
 
-            # Get the parent frame for this sphere
-            parent_frame = self.sphere_store.group_nodes.get(sphere.link)
+            # Get the parent frame for this geometry
+            parent_frame = self.geometry_store.group_nodes.get(geometry.link)
             if parent_frame is not None:
-                control_name = f"{parent_frame.name}/transform_control_{sphere.id}"
+                control_name = f"{parent_frame.name}/transform_control_{geometry.id}"
 
                 # Disable rotation for spheres (they are symmetric), enable for boxes and cylinders
-                disable_rotations = sphere.geometry_type == "sphere"
+                disable_rotations = geometry.geometry_type == "sphere"
 
                 self.transform_control = self.server.scene.add_transform_controls(
                     control_name,
                     scale=0.7,
                     disable_rotations=disable_rotations,
-                    position=sphere.local_xyz,
+                    position=geometry.local_xyz,
                     wxyz=(
-                        sphere.local_wxyz
+                        geometry.local_wxyz
                         if not disable_rotations
                         else (1.0, 0.0, 0.0, 0.0)
                     ),
@@ -928,20 +891,22 @@ class BubblifyApp:
                 @self.transform_control.on_update
                 def _(_):
                     if (
-                        self.current_sphere_id is not None
-                        and self.current_sphere_id in self.sphere_store.by_id
+                        self.current_geometry_id is not None
+                        and self.current_geometry_id in self.geometry_store.by_id
                     ):
-                        current_sphere = self.sphere_store.by_id[self.current_sphere_id]
+                        current_geometry = self.geometry_store.by_id[
+                            self.current_geometry_id
+                        ]
                         # Update position
-                        current_sphere.local_xyz = tuple(
+                        current_geometry.local_xyz = tuple(
                             self.transform_control.position
                         )
                         # Update rotation only for non-sphere geometries
-                        if current_sphere.geometry_type != "sphere":
-                            current_sphere.update_rpy_from_quaternion(
+                        if current_geometry.geometry_type != "sphere":
+                            current_geometry.update_rpy_from_quaternion(
                                 tuple(self.transform_control.wxyz)
                             )
-                        self._update_geometry_visualization(current_sphere)
+                        self._update_geometry_visualization(current_geometry)
                         self._update_radius_gizmo()
                         self._update_box_resize_gizmos()
                         self._update_cylinder_height_gizmos()
@@ -1162,23 +1127,23 @@ class BubblifyApp:
                 self._updating_geometry_ui = False
 
     def _update_radius_gizmo(self):
-        """Update radius gizmo for the currently selected sphere or cylinder."""
+        """Update radius gizmo for the currently selected geometry (sphere or cylinder)."""
         # Remove any previous gizmo
         self._remove_radius_gizmo()
 
         if (
-            self.current_sphere_id is None
-            or self.current_sphere_id not in self.sphere_store.by_id
+            self.current_geometry_id is None
+            or self.current_geometry_id not in self.geometry_store.by_id
         ):
             return
 
-        s = self.sphere_store.by_id[self.current_sphere_id]
+        s = self.geometry_store.by_id[self.current_geometry_id]
 
         # Only create radius gizmo for non-box geometries (sphere and cylinder)
         if s.geometry_type == "box":
             return
 
-        parent_frame = self.sphere_store.group_nodes.get(s.link)
+        parent_frame = self.geometry_store.group_nodes.get(s.link)
         if parent_frame is None:
             return
 
@@ -1277,10 +1242,10 @@ class BubblifyApp:
 
         @self.radius_gizmo.on_update
         def _(_):
-            if self.current_sphere_id not in self.sphere_store.by_id:
+            if self.current_geometry_id not in self.geometry_store.by_id:
                 return
 
-            s2 = self.sphere_store.by_id[self.current_sphere_id]
+            s2 = self.geometry_store.by_id[self.current_geometry_id]
 
             # Only update if this is not a box geometry
             if s2.geometry_type == "box":
@@ -1307,9 +1272,9 @@ class BubblifyApp:
                 s2.radius = new_radius
                 # Update UI slider without triggering callbacks
                 if self._sphere_radius_slider:
-                    self._updating_sphere_ui = True
+                    self._updating_geometry_ui = True
                     self._sphere_radius_slider.value = new_radius
-                    self._updating_sphere_ui = False
+                    self._updating_geometry_ui = False
             elif s2.geometry_type == "cylinder":
                 s2.cylinder_radius = new_radius
                 # Update UI slider without triggering callbacks
@@ -1609,7 +1574,6 @@ class BubblifyApp:
         """Update the geometry property UI controls to reflect the currently selected geometry."""
         # Set flag to prevent recursive updates
         self._updating_geometry_ui = True
-        self._updating_sphere_ui = True  # For backward compatibility
 
         if (
             self.current_geometry_id is not None
@@ -1683,22 +1647,16 @@ class BubblifyApp:
 
         # Clear flag after UI update
         self._updating_geometry_ui = False
-        self._updating_sphere_ui = False
-
-    # Keep backward compatibility alias
-    def _update_sphere_properties_ui(self):
-        """Update the sphere property UI controls (backward compatibility)."""
-        return self._update_geometry_properties_ui()
 
     def _sync_link_selection(self):
-        """Sync link selection between visibility controls and sphere editor."""
+        """Sync link selection between visibility controls and geometry editor."""
         # Sync visibility dropdown if different
         if (
             self._current_link_dropdown
             and self._current_link_dropdown.value != self.current_link
         ):
             self._current_link_dropdown.value = self.current_link
-        # Sync sphere editor dropdown if different
+        # Sync geometry editor dropdown if different
         if self._link_dropdown and self._link_dropdown.value != self.current_link:
             self._link_dropdown.value = self.current_link
 
@@ -1714,19 +1672,14 @@ class BubblifyApp:
                 if expected_value in self._geometry_dropdown.options:
                     self._geometry_dropdown.value = expected_value
 
-    # Keep backward compatibility alias
-    def _sync_sphere_selection(self):
-        """Sync sphere dropdown to reflect the currently selected sphere (backward compatibility)."""
-        return self._sync_geometry_selection()
-
-    def _get_sphere_opacity(self, sphere: Geometry) -> float:
-        """Get the appropriate opacity for a sphere based on current selection state."""
-        if sphere.id == self.current_sphere_id:
-            return self.selected_sphere_opacity
-        elif sphere.link == self.current_link:
-            return self.unselected_spheres_opacity
+    def _get_geometry_opacity(self, geometry: Geometry) -> float:
+        """Get the appropriate opacity for a geometry based on current selection state."""
+        if geometry.id == self.current_geometry_id:
+            return self.selected_geometry_opacity
+        elif geometry.link == self.current_link:
+            return self.unselected_geometries_opacity
         else:
-            return self.other_links_spheres_opacity
+            return self.other_links_geometries_opacity
 
     def _update_mesh_visibility(self):
         """Update visibility of robot meshes based on link selection."""
@@ -1740,15 +1693,24 @@ class BubblifyApp:
                     # This is a non-selected link
                     mesh_handle.visible = self.show_other_links
 
-    def _update_sphere_opacities(self):
-        """Update opacity of all spheres based on current selection state."""
-        for sphere in self.sphere_store.by_id.values():
-            if sphere.node is not None:
-                new_opacity = self._get_sphere_opacity(sphere)
-                # Update sphere opacity
-                sphere.node.opacity = new_opacity
-                # Handle visibility (0.0 opacity = invisible)
-                sphere.node.visible = new_opacity > 0.0
+    def _update_geometry_opacities(self):
+        """Update opacity of all geometries based on current selection state."""
+        for geometry in self.geometry_store.by_id.values():
+            if geometry.node is not None:
+                new_opacity = self._get_geometry_opacity(geometry)
+
+                if geometry.geometry_type in ["sphere", "box"]:
+                    # For sphere and box, use viser's opacity parameter
+                    geometry.node.opacity = new_opacity
+                    # Handle visibility (0.0 opacity = invisible)
+                    geometry.node.visible = new_opacity > 0.0
+                elif geometry.geometry_type == "cylinder":
+                    # For cylinder/capsule, we need to recreate the mesh with new opacity
+                    # This is because trimesh opacity is baked into face_colors
+                    self._update_geometry_visualization(geometry)
+
+                # Handle visibility for all types
+                geometry.node.visible = new_opacity > 0.0
 
     def _load_spherization_yaml(self, yaml_path: Path):
         """Load sphere configuration from YAML file at startup."""
@@ -1810,7 +1772,7 @@ class BubblifyApp:
                 for link_name, spheres_data in collision_spheres.items():
                     for sphere_data in spheres_data:
                         # Old format - only spheres, no rotation
-                        sphere = self.sphere_store.add(
+                        sphere = self.geometry_store.add(
                             link_name,
                             xyz=tuple(sphere_data["center"]),
                             radius=sphere_data["radius"],
