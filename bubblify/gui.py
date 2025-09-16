@@ -410,10 +410,6 @@ class BubblifyApp:
                 self._update_sphere_opacities()
                 self._update_mesh_visibility()
 
-                # Update counts
-                total_geometry_count.value = str(len(self.geometry_store.by_id))
-                link_geometry_count.value = str(len(geometries))
-
             # Keep backward compatibility alias
             update_sphere_dropdown = update_geometry_dropdown
 
@@ -1043,56 +1039,77 @@ class BubblifyApp:
         length, width, height = geometry.size
         center_x, center_y, center_z = geometry.local_xyz
 
-        # Create gizmos for each axis (X, Y, Z) - 简化版本，暂时不考虑box旋转
+        # Get the box's rotation
+        try:
+            # 确保quaternion是正确的格式
+            wxyz = geometry.local_wxyz
+            if isinstance(wxyz, tuple):
+                wxyz = np.array(wxyz)
+            box_rotation = tf.SO3(wxyz)
+        except Exception as e:
+            print(f"Error creating box rotation: {e}")
+            # 如果旋转有问题，使用单位旋转
+            box_rotation = tf.SO3.identity()
+
+        # Create gizmos for each axis (X, Y, Z)
+        # 负方向的gizmo轴方向会跟随box的姿态变化
         axes_info = [
             {
                 "name": "x_neg",
                 "axis": (-1, 0, 0),
                 "color": (200, 80, 80),
-                "position": (
-                    center_x - length / 2,
-                    center_y,
-                    center_z,
-                ),  # 直接使用世界坐标
+                "local_position": np.array(
+                    [-length / 2, 0, 0]
+                ),  # box本地坐标系中的位置
                 "active_axes": (True, False, False),
-                "rotation": tf.SO3.from_y_radians(
+                "base_rotation": tf.SO3.from_y_radians(
                     math.pi
-                ),  # 简单的旋转，箭头指向相反方向
+                ),  # 基础旋转：箭头指向相反方向
             },
             {
                 "name": "y_neg",
                 "axis": (0, -1, 0),
                 "color": (80, 200, 80),
-                "position": (
-                    center_x,
-                    center_y - width / 2,
-                    center_z,
-                ),  # 直接使用世界坐标
+                "local_position": np.array([0, -width / 2, 0]),  # box本地坐标系中的位置
                 "active_axes": (False, True, False),
-                "rotation": tf.SO3.from_x_radians(
+                "base_rotation": tf.SO3.from_x_radians(
                     math.pi
-                ),  # 简单的旋转，箭头指向相反方向
+                ),  # 基础旋转：箭头指向相反方向
             },
             {
                 "name": "z_neg",
                 "axis": (0, 0, -1),
                 "color": (80, 80, 200),
-                "position": (
-                    center_x,
-                    center_y,
-                    center_z - height / 2,
-                ),  # 直接使用世界坐标
+                "local_position": np.array(
+                    [0, 0, -height / 2]
+                ),  # box本地坐标系中的位置
                 "active_axes": (False, False, True),
-                "rotation": tf.SO3.from_x_radians(
+                "base_rotation": tf.SO3.from_x_radians(
                     math.pi
-                ),  # 简单的旋转，箭头指向相反方向
+                ),  # 修复：使用base_rotation并绕Z轴旋转
             },
         ]
 
         for axis_info in axes_info:
-            # 直接使用计算好的位置和旋转
-            world_position = axis_info["position"]
-            gizmo_rotation = axis_info["rotation"]
+            # 计算gizmo在世界坐标系中的位置
+            # 将本地位置通过box的旋转变换到世界坐标系
+            local_pos = axis_info["local_position"]
+            world_pos_offset = box_rotation @ local_pos  # 使用 @ 操作符进行旋转变换
+            world_position = (
+                center_x + world_pos_offset[0],
+                center_y + world_pos_offset[1],
+                center_z + world_pos_offset[2],
+            )
+
+            # 计算gizmo的旋转：box旋转 @ 基础旋转 (使用 @ 操作符组合旋转)
+            try:
+                if "base_rotation" in axis_info:
+                    gizmo_rotation = box_rotation @ axis_info["base_rotation"]
+                else:
+                    gizmo_rotation = axis_info["rotation"]
+            except Exception as e:
+                print(f"Error computing gizmo rotation: {e}")
+                gizmo_rotation = axis_info.get("base_rotation", tf.SO3.identity())
 
             gizmo_name = (
                 f"{parent_frame.name}/box_resize_{geometry.id}_{axis_info['name']}"
@@ -1108,6 +1125,7 @@ class BubblifyApp:
                 wxyz=gizmo_rotation.wxyz,
                 position=world_position,
                 opacity=0.8,
+                # depth_test=False,
             )
 
             # Store the gizmo and setup callback
@@ -1136,20 +1154,47 @@ class BubblifyApp:
             center = geometry.local_xyz
             old_size = geometry.size
 
-            # Calculate new size based on gizmo position and axis direction
+            # 计算考虑旋转的新尺寸
+            import numpy as np
+            from viser import transforms as tf
+
+            # 获取box的旋转
+            try:
+                wxyz = geometry.local_wxyz
+                if isinstance(wxyz, tuple):
+                    wxyz = np.array(wxyz)
+                box_rotation = tf.SO3(wxyz)
+                # 计算逆旋转，用于将世界坐标转换回box局部坐标
+                box_rotation_inv = tf.SO3.from_matrix(
+                    np.linalg.inv(box_rotation.as_matrix())
+                )
+            except Exception as e:
+                print(f"Error computing box rotation: {e}")
+                box_rotation = tf.SO3.identity()
+                box_rotation_inv = tf.SO3.identity()
+
+            # 计算gizmo位置在box局部坐标系中的位置
+            gizmo_pos_local = np.array(gizmo_pos) - np.array(center)  # 相对于中心的位置
+            try:
+                # 将世界坐标转换回box局部坐标
+                gizmo_pos_local = box_rotation_inv @ gizmo_pos_local
+            except Exception as e:
+                print(f"Error transforming coordinates: {e}")
+
+            # 计算新尺寸
             new_size = list(geometry.size)
 
             if "x" in axis_name:
-                # X-axis resize
-                distance = abs(gizmo_pos[0] - center[0])
+                # X-axis resize - 使用局部坐标系中的X轴距离
+                distance = abs(gizmo_pos_local[0])
                 new_size[0] = max(0.01, distance * 2)  # Minimum size 1cm
             elif "y" in axis_name:
-                # Y-axis resize
-                distance = abs(gizmo_pos[1] - center[1])
+                # Y-axis resize - 使用局部坐标系中的Y轴距离
+                distance = abs(gizmo_pos_local[1])
                 new_size[1] = max(0.01, distance * 2)  # Minimum size 1cm
             elif "z" in axis_name:
-                # Z-axis resize
-                distance = abs(gizmo_pos[2] - center[2])
+                # Z-axis resize - 使用局部坐标系中的Z轴距离
+                distance = abs(gizmo_pos_local[2])
                 new_size[2] = max(0.01, distance * 2)  # Minimum size 1cm
 
             # Update geometry size
@@ -1181,17 +1226,36 @@ class BubblifyApp:
         length, width, height = geometry.size
         center_x, center_y, center_z = geometry.local_xyz
 
-        # Update positions of gizmos that weren't just moved - 简化版本
-        position_updates = {
-            "x_neg": (center_x - length / 2, center_y, center_z),
-            "y_neg": (center_x, center_y - width / 2, center_z),
-            "z_neg": (center_x, center_y, center_z - height / 2),
+        # Get the box's rotation
+        try:
+            # 确保quaternion是正确的格式
+            wxyz = geometry.local_wxyz
+            if isinstance(wxyz, tuple):
+                wxyz = np.array(wxyz)
+            box_rotation = tf.SO3(wxyz)
+        except Exception as e:
+            print(f"Error creating box rotation: {e}")
+            box_rotation = tf.SO3.identity()
+
+        # Update positions of gizmos that weren't just moved
+        local_positions = {
+            "x_neg": np.array([-length / 2, 0, 0]),
+            "y_neg": np.array([0, -width / 2, 0]),
+            "z_neg": np.array([0, 0, -height / 2]),
         }
 
         for axis_name, gizmo in self.box_resize_gizmos.items():
             if axis_name != changed_axis_name and gizmo is not None:
                 try:
-                    gizmo.position = position_updates[axis_name]
+                    # 计算新的世界坐标位置，考虑box的旋转
+                    local_pos = local_positions[axis_name]
+                    world_pos_offset = box_rotation @ local_pos  # 使用 @ 操作符
+                    world_position = (
+                        center_x + world_pos_offset[0],
+                        center_y + world_pos_offset[1],
+                        center_z + world_pos_offset[2],
+                    )
+                    gizmo.position = world_position
                 except Exception:
                     pass  # Ignore errors if gizmo is being removed
 
