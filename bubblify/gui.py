@@ -89,6 +89,8 @@ class BubblifyApp:
 
         # Box resize gizmos (one for each axis: X, Y, Z)
         self.box_resize_gizmos: Dict[str, viser.TransformControlsHandle] = {}
+        # Cylinder height gizmos (for Z-axis height adjustment)
+        self.cylinder_height_gizmos: Dict[str, viser.TransformControlsHandle] = {}
 
         # GUI control references for syncing
         self._link_dropdown = None
@@ -406,6 +408,7 @@ class BubblifyApp:
                 self._update_transform_control()
                 self._update_radius_gizmo()
                 self._update_box_resize_gizmos()
+                self._update_cylinder_height_gizmos()
                 self._update_geometry_properties_ui()
                 self._update_sphere_opacities()
                 self._update_mesh_visibility()
@@ -433,6 +436,7 @@ class BubblifyApp:
                     self._update_transform_control()
                     self._update_radius_gizmo()
                     self._update_box_resize_gizmos()
+                    self._update_cylinder_height_gizmos()
                     self._update_geometry_properties_ui()
                     self._update_sphere_opacities()
                 else:
@@ -497,6 +501,7 @@ class BubblifyApp:
                 self._update_transform_control()
                 self._update_radius_gizmo()
                 self._update_box_resize_gizmos()
+                self._update_cylinder_height_gizmos()
                 self._update_geometry_properties_ui()
                 self._update_sphere_opacities()
 
@@ -553,6 +558,7 @@ class BubblifyApp:
                     self._update_geometry_visualization(geometry)
                     self._update_radius_gizmo()
                     self._update_box_resize_gizmos()
+                    self._update_cylinder_height_gizmos()
 
             # Keep backward compatibility alias
             update_sphere_properties = update_geometry_properties
@@ -818,6 +824,7 @@ class BubblifyApp:
             self._update_transform_control()
             self._update_radius_gizmo()
             self._update_box_resize_gizmos()
+            self._update_cylinder_height_gizmos()
             self._update_sphere_opacities()
             self._update_mesh_visibility()
             self._update_geometry_properties_ui()
@@ -901,6 +908,7 @@ class BubblifyApp:
                         self._update_geometry_visualization(current_sphere)
                         self._update_radius_gizmo()
                         self._update_box_resize_gizmos()
+                        self._update_cylinder_height_gizmos()
                         # Update UI to show current rotation
                         self._update_geometry_properties_ui()
 
@@ -911,6 +919,7 @@ class BubblifyApp:
             self.transform_control = None
         self._remove_radius_gizmo()
         self._remove_box_resize_gizmos()
+        self._remove_cylinder_height_gizmos()
 
     def _remove_radius_gizmo(self):
         """Remove the current radius gizmo."""
@@ -927,6 +936,194 @@ class BubblifyApp:
                 except Exception:
                     pass
         self.box_resize_gizmos.clear()
+
+    def _remove_cylinder_height_gizmos(self):
+        """Remove all cylinder height gizmos."""
+        for gizmo in self.cylinder_height_gizmos.values():
+            if gizmo is not None:
+                try:
+                    gizmo.remove()
+                except Exception:
+                    pass
+        self.cylinder_height_gizmos.clear()
+
+    def _update_cylinder_height_gizmos(self):
+        """Update cylinder height gizmos for the currently selected cylinder geometry."""
+        # Remove any previous gizmos
+        self._remove_cylinder_height_gizmos()
+
+        if (
+            self.current_geometry_id is None
+            or self.current_geometry_id not in self.geometry_store.by_id
+        ):
+            return
+
+        geometry = self.geometry_store.by_id[self.current_geometry_id]
+
+        # Only create gizmos for cylinder geometry
+        if geometry.geometry_type != "cylinder":
+            return
+
+        parent_frame = self.geometry_store.group_nodes.get(geometry.link)
+        if parent_frame is None:
+            return
+
+        import math
+        import numpy as np
+        from viser import transforms as tf
+
+        # Cylinder dimensions
+        cylinder_height = geometry.cylinder_height
+        center_x, center_y, center_z = geometry.local_xyz
+
+        # Get the cylinder's rotation
+        try:
+            wxyz = geometry.local_wxyz
+            if isinstance(wxyz, tuple):
+                wxyz = np.array(wxyz)
+            cylinder_rotation = tf.SO3(wxyz)
+        except Exception as e:
+            print(f"Error creating cylinder rotation: {e}")
+            cylinder_rotation = tf.SO3.identity()
+
+        # Create gizmo for Z-axis (height adjustment) - 只创建负方向的gizmo
+        # 计算translation_limits: gizmo最多能向中心移动到距离中心0.005的位置
+        max_inward_movement = -(cylinder_height / 2 - 0.005)  # 负值表示向中心移动
+
+        axis_info = {
+            "name": "z_neg",
+            "axis": (0, 0, -1),
+            "color": (80, 80, 200),
+            "local_position": np.array([0, 0, -cylinder_height / 2]),  # 底部
+            "active_axes": (False, False, True),  # 只允许Z轴移动
+            "base_rotation": tf.SO3.from_x_radians(math.pi),  # 负方向：箭头指向相反方向
+            "translation_limits": (
+                (-10.0, 10.0),  # X轴无限制
+                (-10.0, 10.0),  # Y轴无限制
+                (
+                    max_inward_movement,
+                    10.0,
+                ),  # Z轴：能向中心移动但不能穿过，能向外无限移动
+            ),
+        }
+
+        # 计算gizmo在世界坐标系中的位置
+        local_pos = axis_info["local_position"]
+
+        # 确保local_pos是numpy数组
+        if not isinstance(local_pos, np.ndarray):
+            local_pos = np.array(local_pos)
+
+        world_pos_offset = cylinder_rotation @ local_pos
+        world_position = (
+            center_x + world_pos_offset[0],
+            center_y + world_pos_offset[1],
+            center_z + world_pos_offset[2],
+        )
+
+        # 计算gizmo的旋转：cylinder旋转 @ 基础旋转
+        try:
+            gizmo_rotation = cylinder_rotation @ axis_info["base_rotation"]
+        except Exception as e:
+            print(f"Error computing cylinder gizmo rotation: {e}")
+            gizmo_rotation = axis_info["base_rotation"]
+
+        gizmo_name = (
+            f"{parent_frame.name}/cylinder_height_{geometry.id}_{axis_info['name']}"
+        )
+
+        # 获取translation_limits参数
+        translation_limits = axis_info.get(
+            "translation_limits",
+            ((-1000.0, 1000.0), (-1000.0, 1000.0), (-1000.0, 1000.0)),
+        )
+
+        gizmo = self.server.scene.add_transform_controls(
+            gizmo_name,
+            scale=0.2,
+            line_width=15.0,  # 稍细一些，区别于box的gizmo
+            active_axes=axis_info["active_axes"],
+            disable_sliders=True,
+            disable_rotations=True,
+            wxyz=gizmo_rotation.wxyz,
+            position=world_position,
+            opacity=0.8,
+            depth_test=False,
+            translation_limits=translation_limits,
+        )
+
+        # Store the gizmo and setup callback
+        self.cylinder_height_gizmos[axis_info["name"]] = gizmo
+
+        # Create callback for this specific gizmo
+        self._setup_cylinder_height_callback(
+            gizmo, axis_info["name"], axis_info["axis"]
+        )
+
+    def _setup_cylinder_height_callback(self, gizmo, axis_name, axis_direction):
+        """Setup callback for a specific cylinder height gizmo."""
+
+        @gizmo.on_update
+        def _(_):
+            if (
+                self.current_geometry_id is None
+                or self.current_geometry_id not in self.geometry_store.by_id
+            ):
+                return
+
+            geometry = self.geometry_store.by_id[self.current_geometry_id]
+
+            # Only update if this is a cylinder geometry
+            if geometry.geometry_type != "cylinder":
+                return
+
+            # Get current gizmo position
+            gizmo_pos = gizmo.position
+            center = geometry.local_xyz
+
+            # 计算考虑旋转的新高度
+            import numpy as np
+            from viser import transforms as tf
+
+            # 获取cylinder的旋转
+            try:
+                wxyz = geometry.local_wxyz
+                if isinstance(wxyz, tuple):
+                    wxyz = np.array(wxyz)
+                cylinder_rotation = tf.SO3(wxyz)
+                # 计算逆旋转，用于将世界坐标转换回cylinder局部坐标
+                cylinder_rotation_inv = tf.SO3.from_matrix(
+                    np.linalg.inv(cylinder_rotation.as_matrix())
+                )
+            except Exception as e:
+                print(f"Error computing cylinder rotation: {e}")
+                cylinder_rotation = tf.SO3.identity()
+                cylinder_rotation_inv = tf.SO3.identity()
+
+            # 计算gizmo位置在cylinder局部坐标系中的位置
+            gizmo_pos_local = np.array(gizmo_pos) - np.array(center)  # 相对于中心的位置
+            try:
+                # 将世界坐标转换回cylinder局部坐标
+                gizmo_pos_local = cylinder_rotation_inv @ gizmo_pos_local
+            except Exception as e:
+                print(f"Error transforming coordinates: {e}")
+
+            # 计算新高度
+            # Z-axis resize - 使用局部坐标系中的Z轴距离
+            distance = abs(gizmo_pos_local[2])
+            new_height = max(0.01, distance * 2)  # Minimum height 1cm
+
+            # Update geometry height
+            geometry.cylinder_height = new_height
+
+            # Update visualization
+            self._update_geometry_visualization(geometry)
+
+            # Update UI slider without triggering callbacks
+            if self._cylinder_height_slider:
+                self._updating_geometry_ui = True
+                self._cylinder_height_slider.value = new_height
+                self._updating_geometry_ui = False
 
     def _update_radius_gizmo(self):
         """Update radius gizmo for the currently selected sphere or cylinder."""
@@ -1568,4 +1765,5 @@ class BubblifyApp:
             # Cleanup
             self._remove_transform_control()
             self._remove_radius_gizmo()
+            self._remove_cylinder_height_gizmos()
             self.urdf_viz.remove()
