@@ -905,7 +905,9 @@ class BubblifyApp:
 
     def _remove_box_resize_gizmos(self):
         """Remove all box resize gizmos."""
-        for gizmo in self.box_resize_gizmos.values():
+        # Create a copy of the values to avoid modifying dict during iteration
+        gizmos_to_remove = list(self.box_resize_gizmos.values())
+        for gizmo in gizmos_to_remove:
             if gizmo is not None:
                 try:
                     gizmo.remove()
@@ -915,7 +917,9 @@ class BubblifyApp:
 
     def _remove_cylinder_height_gizmos(self):
         """Remove all cylinder height gizmos."""
-        for gizmo in self.cylinder_height_gizmos.values():
+        # Create a copy of the values to avoid modifying dict during iteration
+        gizmos_to_remove = list(self.cylinder_height_gizmos.values())
+        for gizmo in gizmos_to_remove:
             if gizmo is not None:
                 try:
                     gizmo.remove()
@@ -977,7 +981,7 @@ class BubblifyApp:
                 (-10.0, 10.0),  # X轴无限制
                 (-10.0, 10.0),  # Y轴无限制
                 (
-                    max_inward_movement,
+                    -0.05,
                     10.0,
                 ),  # Z轴：能向中心移动但不能穿过，能向外无限移动
             ),
@@ -1207,7 +1211,7 @@ class BubblifyApp:
             position=gizmo_pos,
             translation_limits=(
                 (
-                    max_inward_movement,
+                    -0.05,
                     10.0,
                 ),  # X轴（旋转后的）：能向中心移动但不穿过，能向外无限移动
                 (-10.0, 10.0),  # Y轴无限制
@@ -1324,7 +1328,7 @@ class BubblifyApp:
                     math.pi
                 ),  # 基础旋转：箭头指向相反方向
                 "translation_limits": (
-                    (max_inward_x, 10.0),  # X轴：能向中心移动但不穿过，能向外无限移动
+                    (-0.05, 10.0),  # X轴：能向中心移动但不穿过，能向外无限移动
                     (-10.0, 10.0),  # Y轴无限制
                     (-10.0, 10.0),  # Z轴无限制
                 ),
@@ -1340,7 +1344,7 @@ class BubblifyApp:
                 ),  # 基础旋转：箭头指向相反方向
                 "translation_limits": (
                     (-10.0, 10.0),  # X轴无限制
-                    (max_inward_y, 10.0),  # Y轴：能向中心移动但不穿过，能向外无限移动
+                    (-0.05, 10.0),  # Y轴：能向中心移动但不穿过，能向外无限移动
                     (-10.0, 10.0),  # Z轴无限制
                 ),
             },
@@ -1358,7 +1362,7 @@ class BubblifyApp:
                 "translation_limits": (
                     (-10.0, 10.0),  # X轴无限制
                     (-10.0, 10.0),  # Y轴无限制
-                    (max_inward_z, 10.0),  # Z轴：能向中心移动但不穿过，能向外无限移动
+                    (-0.05, 10.0),  # Z轴：能向中心移动但不穿过，能向外无限移动
                 ),
             },
         ]
