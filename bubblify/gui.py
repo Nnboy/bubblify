@@ -929,7 +929,7 @@ class BubblifyApp:
         self.box_resize_gizmos.clear()
 
     def _update_radius_gizmo(self):
-        """Update radius gizmo for the currently selected sphere."""
+        """Update radius gizmo for the currently selected sphere or cylinder."""
         # Remove any previous gizmo
         self._remove_radius_gizmo()
 
@@ -940,6 +940,11 @@ class BubblifyApp:
             return
 
         s = self.sphere_store.by_id[self.current_sphere_id]
+
+        # Only create radius gizmo for non-box geometries (sphere and cylinder)
+        if s.geometry_type == "box":
+            return
+
         parent_frame = self.sphere_store.group_nodes.get(s.link)
         if parent_frame is None:
             return
@@ -948,9 +953,18 @@ class BubblifyApp:
         import math
 
         angle = 3 * math.pi / 4  # 135 degrees
+
+        # Get the appropriate radius based on geometry type
+        if s.geometry_type == "sphere":
+            current_radius = s.radius
+        elif s.geometry_type == "cylinder":
+            current_radius = s.cylinder_radius
+        else:
+            current_radius = 0.05  # fallback
+
         gizmo_pos = (
-            s.local_xyz[0] + s.radius * math.cos(angle),  # X component at 45°
-            s.local_xyz[1] + s.radius * math.sin(angle),  # Y component at 45°
+            s.local_xyz[0] + current_radius * math.cos(angle),  # X component at 45°
+            s.local_xyz[1] + current_radius * math.sin(angle),  # Y component at 45°
             s.local_xyz[2],  # Same Z as center
         )
 
@@ -981,9 +995,14 @@ class BubblifyApp:
                 return
 
             s2 = self.sphere_store.by_id[self.current_sphere_id]
+
+            # Only update if this is not a box geometry
+            if s2.geometry_type == "box":
+                return
+
             gizmo_pos_current = self.radius_gizmo.position
 
-            # Calculate new radius as distance from sphere center to gizmo position
+            # Calculate new radius as distance from geometry center to gizmo position
             # This is the fundamental relationship: radius = distance from center to gizmo
             center_to_gizmo = (
                 gizmo_pos_current[0] - s2.local_xyz[0],
@@ -995,20 +1014,29 @@ class BubblifyApp:
                 + center_to_gizmo[1] ** 2
                 + center_to_gizmo[2] ** 2
             )
-            new_radius = max(0.0, new_radius)  # Allow zero radius
+            new_radius = max(0.005, new_radius)  # Minimum radius to avoid zero
 
-            # Update sphere radius
-            s2.radius = new_radius
+            # Update radius based on geometry type
+            if s2.geometry_type == "sphere":
+                s2.radius = new_radius
+                # Update UI slider without triggering callbacks
+                if self._sphere_radius_slider:
+                    self._updating_sphere_ui = True
+                    self._sphere_radius_slider.value = new_radius
+                    self._updating_sphere_ui = False
+            elif s2.geometry_type == "cylinder":
+                s2.cylinder_radius = new_radius
+                # Update UI slider without triggering callbacks
+                if self._cylinder_radius_slider:
+                    self._updating_geometry_ui = True
+                    self._cylinder_radius_slider.value = new_radius
+                    self._updating_geometry_ui = False
+
+            # Update visualization
             self._update_geometry_visualization(s2)
 
             # Don't reposition the gizmo here! Let the user drag it freely.
             # The gizmo position directly controls the radius - no secondary positioning logic needed.
-
-            # Update UI slider without triggering callbacks
-            if self._sphere_radius_slider:
-                self._updating_sphere_ui = True
-                self._sphere_radius_slider.value = new_radius
-                self._updating_sphere_ui = False
 
     def _update_box_resize_gizmos(self):
         """Update box resize gizmos for the currently selected box geometry."""
@@ -1023,7 +1051,7 @@ class BubblifyApp:
 
         geometry = self.geometry_store.by_id[self.current_geometry_id]
 
-        # Only create gizmos for box geometries
+        # Only create gizmos for box geometry
         if geometry.geometry_type != "box":
             return
 
@@ -1172,6 +1200,8 @@ class BubblifyApp:
                 return
 
             geometry = self.geometry_store.by_id[self.current_geometry_id]
+
+            # Only update if this is a box geometry
             if geometry.geometry_type != "box":
                 return
 
@@ -1242,6 +1272,8 @@ class BubblifyApp:
 
     def _update_other_box_gizmos(self, changed_axis_name, geometry):
         """Update positions of other box gizmos when one is moved."""
+
+        # Only update if this is a box geometry
         if geometry.geometry_type != "box":
             return
 
