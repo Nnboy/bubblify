@@ -344,8 +344,13 @@ class BubblifyApp:
                 cylinder_height = self.server.gui.add_slider(
                     "Height", min=0.01, max=0.5, step=0.001, initial_value=0.1
                 )
+                # Capsule display option
+                cylinder_as_capsule = self.server.gui.add_checkbox(
+                    "Display as Capsule", initial_value=False
+                )
                 self._cylinder_radius_slider = cylinder_radius
                 self._cylinder_height_slider = cylinder_height
+                self._cylinder_as_capsule_checkbox = cylinder_as_capsule
 
             # Common properties
             geometry_color = self.server.gui.add_rgb(
@@ -539,6 +544,7 @@ class BubblifyApp:
                     elif geometry.geometry_type == "cylinder":
                         geometry.cylinder_radius = float(cylinder_radius.value)
                         geometry.cylinder_height = float(cylinder_height.value)
+                        geometry.display_as_capsule = bool(cylinder_as_capsule.value)
 
                     # Update rotation properties only for non-sphere geometries
                     if geometry.geometry_type != "sphere":
@@ -570,6 +576,7 @@ class BubblifyApp:
             box_height.on_update(lambda _: update_geometry_properties())
             cylinder_radius.on_update(lambda _: update_geometry_properties())
             cylinder_height.on_update(lambda _: update_geometry_properties())
+            cylinder_as_capsule.on_update(lambda _: update_geometry_properties())
             geometry_color.on_update(lambda _: update_geometry_properties())
             # Connect rotation sliders (will only affect non-sphere geometries)
             roll_slider.on_update(lambda _: update_geometry_properties())
@@ -768,25 +775,54 @@ class BubblifyApp:
             import trimesh
             import numpy as np
 
-            # Create a cylinder mesh
-            cylinder_mesh = trimesh.creation.cylinder(
-                radius=geometry.cylinder_radius,
-                height=geometry.cylinder_height,
-                sections=16,  # Number of sides for the cylinder
-            )
+            if geometry.display_as_capsule:
+                # Create a capsule (cylinder with spherical caps)
+                # Create the main cylinder with more sections for smoother appearance
+                cylinder_mesh = trimesh.creation.cylinder(
+                    radius=geometry.cylinder_radius,
+                    height=geometry.cylinder_height,
+                    sections=32,  # More sections for smoother cylinder surface
+                )
+
+                # Create spherical caps with higher subdivision for smoother appearance
+                sphere_top = trimesh.creation.icosphere(
+                    subdivisions=3,
+                    radius=geometry.cylinder_radius,  # 1280 faces for smooth appearance
+                )
+                sphere_bottom = trimesh.creation.icosphere(
+                    subdivisions=3,
+                    radius=geometry.cylinder_radius,  # 1280 faces for smooth appearance
+                )
+
+                # Position the spheres at the cylinder ends
+                sphere_top.apply_translation([0, 0, geometry.cylinder_height / 2])
+                sphere_bottom.apply_translation([0, 0, -geometry.cylinder_height / 2])
+
+                # Combine cylinder and spheres into a capsule
+                capsule_mesh = trimesh.util.concatenate(
+                    [cylinder_mesh, sphere_top, sphere_bottom]
+                )
+                final_mesh = capsule_mesh
+            else:
+                # Create a regular cylinder mesh with more sections for smoother appearance
+                final_mesh = trimesh.creation.cylinder(
+                    radius=geometry.cylinder_radius,
+                    height=geometry.cylinder_height,
+                    sections=32,  # More sections for smoother cylinder surface
+                )
 
             # Set the mesh color
             # Convert RGB tuple (0-255) to RGB array (0-1)
             color_rgb = np.array(geometry.color) / 255.0
-            cylinder_mesh.visual.face_colors = np.tile(
+            final_mesh.visual.face_colors = np.tile(
                 np.append(color_rgb, opacity if opacity is not None else 1.0),
-                (len(cylinder_mesh.faces), 1),
+                (len(final_mesh.faces), 1),
             )
 
-            # Add the cylinder as a trimesh
+            # Add the mesh as a trimesh
             geometry.node = self.server.scene.add_mesh_trimesh(
-                f"{parent_frame.name}/cylinder_{geometry.id}",
-                cylinder_mesh,
+                f"{parent_frame.name}/{'capsule' if geometry.display_as_capsule else 'cylinder'}_{geometry.id}",
+                final_mesh,
                 position=geometry.local_xyz,
                 wxyz=geometry.local_wxyz,  # Add rotation
                 visible=True,
@@ -1595,6 +1631,10 @@ class BubblifyApp:
                     self._cylinder_radius_slider.value = geometry.cylinder_radius
                 if self._cylinder_height_slider:
                     self._cylinder_height_slider.value = geometry.cylinder_height
+                if self._cylinder_as_capsule_checkbox:
+                    self._cylinder_as_capsule_checkbox.value = (
+                        geometry.display_as_capsule
+                    )
 
             # Update color input
             if self._geometry_color_input:
