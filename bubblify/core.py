@@ -53,6 +53,7 @@ class Geometry:
     # Cylinder parameters
     cylinder_radius: float = 0.05
     cylinder_height: float = 0.1
+    display_as_capsule: bool = False  # Whether to display cylinder as capsule
 
     # Visualization
     color: Tuple[int, int, int] = (255, 180, 60)
@@ -156,6 +157,7 @@ class GeometryStore:
         size: Tuple[float, float, float] = (0.1, 0.1, 0.1),
         cylinder_radius: float = 0.05,
         cylinder_height: float = 0.1,
+        display_as_capsule: bool = False,
         rpy: Tuple[float, float, float] = (0.0, 0.0, 0.0),
         wxyz: Optional[Tuple[float, float, float, float]] = None,
     ) -> Geometry:
@@ -181,6 +183,7 @@ class GeometryStore:
             size=size,
             cylinder_radius=cylinder_radius,
             cylinder_height=cylinder_height,
+            display_as_capsule=display_as_capsule,
         )
         self.by_id[g.id] = g
         self.ids_by_link.setdefault(link, []).append(g.id)

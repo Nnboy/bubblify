@@ -750,33 +750,13 @@ class BubblifyApp:
             import numpy as np
 
             if geometry.display_as_capsule:
-                # Create a capsule (cylinder with spherical caps)
-                # Create the main cylinder with more sections for smoother appearance
-                cylinder_mesh = trimesh.creation.cylinder(
-                    radius=geometry.cylinder_radius,
+                # Create a capsule using Trimesh's built-in capsule method
+                # This is more efficient and creates a proper capsule mesh
+                final_mesh = trimesh.creation.capsule(
                     height=geometry.cylinder_height,
-                    sections=32,  # More sections for smoother cylinder surface
+                    radius=geometry.cylinder_radius,
+                    count=[32, 32],  # [latitude, longitude] sections for smooth surface
                 )
-
-                # Create spherical caps with higher subdivision for smoother appearance
-                sphere_top = trimesh.creation.icosphere(
-                    subdivisions=3,
-                    radius=geometry.cylinder_radius,  # 1280 faces for smooth appearance
-                )
-                sphere_bottom = trimesh.creation.icosphere(
-                    subdivisions=3,
-                    radius=geometry.cylinder_radius,  # 1280 faces for smooth appearance
-                )
-
-                # Position the spheres at the cylinder ends
-                sphere_top.apply_translation([0, 0, geometry.cylinder_height / 2])
-                sphere_bottom.apply_translation([0, 0, -geometry.cylinder_height / 2])
-
-                # Combine cylinder and spheres into a capsule
-                capsule_mesh = trimesh.util.concatenate(
-                    [cylinder_mesh, sphere_top, sphere_bottom]
-                )
-                final_mesh = capsule_mesh
             else:
                 # Create a regular cylinder mesh with more sections for smoother appearance
                 final_mesh = trimesh.creation.cylinder(
@@ -785,18 +765,13 @@ class BubblifyApp:
                     sections=32,  # More sections for smoother cylinder surface
                 )
 
-            # Set the mesh color
-            # Convert RGB tuple (0-255) to RGB array (0-1)
-            color_rgb = np.array(geometry.color) / 255.0
-            final_mesh.visual.face_colors = np.tile(
-                np.append(color_rgb, opacity if opacity is not None else 1.0),
-                (len(final_mesh.faces), 1),
-            )
-
-            # Add the mesh as a trimesh
-            geometry.node = self.server.scene.add_mesh_trimesh(
+            # Use add_mesh_simple to support opacity parameter
+            geometry.node = self.server.scene.add_mesh_simple(
                 f"{parent_frame.name}/{'capsule' if geometry.display_as_capsule else 'cylinder'}_{geometry.id}",
-                final_mesh,
+                vertices=final_mesh.vertices,
+                faces=final_mesh.faces,
+                color=geometry.color,  # RGB tuple (0-255)
+                opacity=opacity,
                 position=geometry.local_xyz,
                 wxyz=geometry.local_wxyz,  # Add rotation
                 visible=True,
@@ -1699,17 +1674,8 @@ class BubblifyApp:
             if geometry.node is not None:
                 new_opacity = self._get_geometry_opacity(geometry)
 
-                if geometry.geometry_type in ["sphere", "box"]:
-                    # For sphere and box, use viser's opacity parameter
-                    geometry.node.opacity = new_opacity
-                    # Handle visibility (0.0 opacity = invisible)
-                    geometry.node.visible = new_opacity > 0.0
-                elif geometry.geometry_type == "cylinder":
-                    # For cylinder/capsule, we need to recreate the mesh with new opacity
-                    # This is because trimesh opacity is baked into face_colors
-                    self._update_geometry_visualization(geometry)
-
-                # Handle visibility for all types
+                # All geometry types now support direct opacity setting
+                geometry.node.opacity = new_opacity
                 geometry.node.visible = new_opacity > 0.0
 
     def _load_spherization_yaml(self, yaml_path: Path):
