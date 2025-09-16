@@ -1048,7 +1048,6 @@ class BubblifyApp:
             box_rotation = tf.SO3(wxyz)
         except Exception as e:
             print(f"Error creating box rotation: {e}")
-            # 如果旋转有问题，使用单位旋转
             box_rotation = tf.SO3.identity()
 
         # Create gizmos for each axis (X, Y, Z)
@@ -1061,20 +1060,32 @@ class BubblifyApp:
                 "local_position": np.array(
                     [-length / 2, 0, 0]
                 ),  # box本地坐标系中的位置
-                "active_axes": (True, False, False),
+                "active_axes": (True, False, False),  # 只允许X轴移动
                 "base_rotation": tf.SO3.from_y_radians(
                     math.pi
                 ),  # 基础旋转：箭头指向相反方向
+                # 设置移动限制：X轴只能向负方向移动，不能穿过中心点
+                "translation_limits": (
+                    (-0.05, 10.0),
+                    (-10.0, 10.0),
+                    (-10.0, 10.0),
+                ),
             },
             {
                 "name": "y_neg",
                 "axis": (0, -1, 0),
                 "color": (80, 200, 80),
                 "local_position": np.array([0, -width / 2, 0]),  # box本地坐标系中的位置
-                "active_axes": (False, True, False),
+                "active_axes": (False, True, False),  # 只允许Y轴移动
                 "base_rotation": tf.SO3.from_x_radians(
                     math.pi
                 ),  # 基础旋转：箭头指向相反方向
+                # 设置移动限制：Y轴只能向负方向移动，不能穿过中心点
+                "translation_limits": (
+                    (-10.0, 10.0),
+                    (-0.05, 10.0),
+                    (-10.0, 10.0),
+                ),
             },
             {
                 "name": "z_neg",
@@ -1083,10 +1094,16 @@ class BubblifyApp:
                 "local_position": np.array(
                     [0, 0, -height / 2]
                 ),  # box本地坐标系中的位置
-                "active_axes": (False, False, True),
+                "active_axes": (False, False, True),  # 只允许Z轴移动
                 "base_rotation": tf.SO3.from_x_radians(
                     math.pi
-                ),  # 修复：使用base_rotation并绕Z轴旋转
+                ),  # 修复：使用base_rotation并绕X轴旋转
+                # 设置移动限制：Z轴只能向负方向移动，不能穿过中心点
+                "translation_limits": (
+                    (-10.0, 10.0),
+                    (-10.0, 10.0),
+                    (-0.05, 10.0),
+                ),
             },
         ]
 
@@ -1094,6 +1111,11 @@ class BubblifyApp:
             # 计算gizmo在世界坐标系中的位置
             # 将本地位置通过box的旋转变换到世界坐标系
             local_pos = axis_info["local_position"]
+
+            # 确保local_pos是numpy数组
+            if not isinstance(local_pos, np.ndarray):
+                local_pos = np.array(local_pos)
+
             world_pos_offset = box_rotation @ local_pos  # 使用 @ 操作符进行旋转变换
             world_position = (
                 center_x + world_pos_offset[0],
@@ -1101,18 +1123,21 @@ class BubblifyApp:
                 center_z + world_pos_offset[2],
             )
 
-            # 计算gizmo的旋转：box旋转 @ 基础旋转 (使用 @ 操作符组合旋转)
+            # 计算gizmo的旋转：box旋转 @ 基础旋转
             try:
-                if "base_rotation" in axis_info:
-                    gizmo_rotation = box_rotation @ axis_info["base_rotation"]
-                else:
-                    gizmo_rotation = axis_info["rotation"]
+                gizmo_rotation = box_rotation @ axis_info["base_rotation"]
             except Exception as e:
                 print(f"Error computing gizmo rotation: {e}")
-                gizmo_rotation = axis_info.get("base_rotation", tf.SO3.identity())
+                gizmo_rotation = axis_info["base_rotation"]
 
             gizmo_name = (
                 f"{parent_frame.name}/box_resize_{geometry.id}_{axis_info['name']}"
+            )
+
+            # 获取translation_limits参数
+            translation_limits = axis_info.get(
+                "translation_limits",
+                ((-1000.0, 1000.0), (-1000.0, 1000.0), (-1000.0, 1000.0)),
             )
 
             gizmo = self.server.scene.add_transform_controls(
@@ -1125,7 +1150,8 @@ class BubblifyApp:
                 wxyz=gizmo_rotation.wxyz,
                 position=world_position,
                 opacity=0.8,
-                # depth_test=False,
+                depth_test=False,
+                translation_limits=translation_limits,  # 添加移动限制
             )
 
             # Store the gizmo and setup callback
