@@ -1148,6 +1148,8 @@ class BubblifyApp:
 
         # Position gizmo at 135 degrees around Z-axis for better visibility
         import math
+        import numpy as np
+        from viser import transforms as tf
 
         angle = 3 * math.pi / 4  # 135 degrees
 
@@ -1159,31 +1161,82 @@ class BubblifyApp:
         else:
             current_radius = 0.05  # fallback
 
-        gizmo_pos = (
-            s.local_xyz[0] + current_radius * math.cos(angle),  # X component at 45°
-            s.local_xyz[1] + current_radius * math.sin(angle),  # Y component at 45°
-            s.local_xyz[2],  # Same Z as center
-        )
+        # Calculate gizmo position and rotation based on geometry type
+        if s.geometry_type == "sphere":
+            # For spheres, use simple 135-degree positioning (no rotation consideration needed)
+            gizmo_pos = (
+                s.local_xyz[0]
+                + current_radius * math.cos(angle),  # X component at 135°
+                s.local_xyz[1]
+                + current_radius * math.sin(angle),  # Y component at 135°
+                s.local_xyz[2],  # Same Z as center
+            )
+            # Simple 135-degree rotation for sphere
+            gizmo_rotation = tf.SO3.from_z_radians(angle)
+        elif s.geometry_type == "cylinder":
+            # For cylinders, consider the cylinder's rotation
+            try:
+                # Get cylinder's rotation
+                wxyz = s.local_wxyz
+                if isinstance(wxyz, tuple):
+                    wxyz = np.array(wxyz)
+                cylinder_rotation = tf.SO3(wxyz)
+            except Exception as e:
+                print(f"Error getting cylinder rotation: {e}")
+                cylinder_rotation = tf.SO3.identity()
+
+            # Create local position in cylinder's coordinate system (135° in XY plane)
+            local_radius_offset = np.array(
+                [
+                    current_radius * math.cos(angle),  # X component at 135°
+                    current_radius * math.sin(angle),  # Y component at 135°
+                    0.0,  # Same Z as center in local coordinates
+                ]
+            )
+
+            # Transform to world coordinates using cylinder's rotation
+            world_radius_offset = cylinder_rotation @ local_radius_offset
+            gizmo_pos = (
+                s.local_xyz[0] + world_radius_offset[0],
+                s.local_xyz[1] + world_radius_offset[1],
+                s.local_xyz[2] + world_radius_offset[2],
+            )
+
+            # Combine cylinder rotation with 135-degree rotation
+            base_rotation = tf.SO3.from_z_radians(angle)
+            gizmo_rotation = cylinder_rotation @ base_rotation
+        else:
+            # Fallback for other geometry types
+            gizmo_pos = (
+                s.local_xyz[0] + current_radius * math.cos(angle),
+                s.local_xyz[1] + current_radius * math.sin(angle),
+                s.local_xyz[2],
+            )
+            gizmo_rotation = tf.SO3.from_z_radians(angle)
 
         gizmo_name = f"{parent_frame.name}/radius_gizmo_{s.id}"
 
-        # Create rotation quaternion for 135 degrees around Z-axis
-        # This rotates the gizmo's X-axis by 135 degrees, making it point diagonally
-        from viser import transforms as tf
+        # Calculate translation limits to prevent gizmo from going through center
+        # The gizmo can move inward until it's 0.005 units from the center
+        max_inward_movement = -(current_radius - 0.005)  # 负值表示向中心移动
 
-        rotation_135deg = tf.SO3.from_z_radians(angle)  # 135° rotation around Z
-
-        # Create a single-axis gizmo that allows full bidirectional movement along the rotated X axis
-        # This allows both increasing and decreasing radius, including going to zero
+        # Create a single-axis gizmo that allows bidirectional movement but prevents going through center
         self.radius_gizmo = self.server.scene.add_transform_controls(
             gizmo_name,
             scale=0.4,  # Reduce size to be less prominent
             active_axes=(True, False, False),  # Only X axis active (but now rotated)
             disable_sliders=True,
             disable_rotations=True,
-            # Allow full range movement - no translation limits to enable zero radius
-            wxyz=rotation_135deg.wxyz,  # Rotate the gizmo 135 degrees
+            wxyz=gizmo_rotation.wxyz,  # Use the calculated rotation (considers cylinder rotation)
             position=gizmo_pos,
+            translation_limits=(
+                (
+                    max_inward_movement,
+                    10.0,
+                ),  # X轴（旋转后的）：能向中心移动但不穿过，能向外无限移动
+                (-10.0, 10.0),  # Y轴无限制
+                (-10.0, 10.0),  # Z轴无限制
+            ),
         )
 
         @self.radius_gizmo.on_update
