@@ -1080,6 +1080,11 @@ class BubblifyApp:
 
         # Create gizmos for each axis (X, Y, Z)
         # 负方向的gizmo轴方向会跟随box的姿态变化
+        # 计算每个轴的最大向内移动距离，防止穿过中心点
+        max_inward_x = -(length / 2 - 0.005)  # X轴最大向中心移动距离
+        max_inward_y = -(width / 2 - 0.005)  # Y轴最大向中心移动距离
+        max_inward_z = -(height / 2 - 0.005)  # Z轴最大向中心移动距离
+
         axes_info = [
             {
                 "name": "x_neg",
@@ -1092,11 +1097,10 @@ class BubblifyApp:
                 "base_rotation": tf.SO3.from_y_radians(
                     math.pi
                 ),  # 基础旋转：箭头指向相反方向
-                # 设置移动限制：X轴只能向负方向移动，不能穿过中心点
                 "translation_limits": (
-                    (-0.05, 10.0),
-                    (-10.0, 10.0),
-                    (-10.0, 10.0),
+                    (max_inward_x, 10.0),  # X轴：能向中心移动但不穿过，能向外无限移动
+                    (-10.0, 10.0),  # Y轴无限制
+                    (-10.0, 10.0),  # Z轴无限制
                 ),
             },
             {
@@ -1108,11 +1112,10 @@ class BubblifyApp:
                 "base_rotation": tf.SO3.from_x_radians(
                     math.pi
                 ),  # 基础旋转：箭头指向相反方向
-                # 设置移动限制：Y轴只能向负方向移动，不能穿过中心点
                 "translation_limits": (
-                    (-10.0, 10.0),
-                    (-0.05, 10.0),
-                    (-10.0, 10.0),
+                    (-10.0, 10.0),  # X轴无限制
+                    (max_inward_y, 10.0),  # Y轴：能向中心移动但不穿过，能向外无限移动
+                    (-10.0, 10.0),  # Z轴无限制
                 ),
             },
             {
@@ -1126,11 +1129,10 @@ class BubblifyApp:
                 "base_rotation": tf.SO3.from_x_radians(
                     math.pi
                 ),  # 修复：使用base_rotation并绕X轴旋转
-                # 设置移动限制：Z轴只能向负方向移动，不能穿过中心点
                 "translation_limits": (
-                    (-10.0, 10.0),
-                    (-10.0, 10.0),
-                    (-0.05, 10.0),
+                    (-10.0, 10.0),  # X轴无限制
+                    (-10.0, 10.0),  # Y轴无限制
+                    (max_inward_z, 10.0),  # Z轴：能向中心移动但不穿过，能向外无限移动
                 ),
             },
         ]
