@@ -26,7 +26,9 @@ def test_gui_final():
         print("🔗 Testing Link Dropdown Syncing:")
         print(f"  • Initial current_link: {app.current_link}")
         print(f"  • Has _link_dropdown reference: {app._link_dropdown is not None}")
-        print(f"  • Has _current_link_text reference: {app._current_link_text is not None}")
+        print(
+            f"  • Has _current_link_text reference: {app._current_link_text is not None}"
+        )
 
         # Test sync functionality
         app.current_link = "panda_link3"
@@ -56,7 +58,7 @@ def test_gui_final():
         # Test export paths and format
         print("💾 Testing Export System:")
         print("  • Default spheres export path: spherization.yml")
-        print("  • Default URDF export path: spherized.urdf")
+        print("  • Default URDF export path: geometries.urdf")
         print("  • YAML format export/import")
         print("  • Detailed error reporting")
         print()
@@ -67,7 +69,9 @@ def test_gui_final():
         for sphere in app.sphere_store.by_id.values():
             if sphere.link not in collision_spheres:
                 collision_spheres[sphere.link] = []
-            collision_spheres[sphere.link].append({"center": list(sphere.local_xyz), "radius": sphere.radius})
+            collision_spheres[sphere.link].append(
+                {"center": list(sphere.local_xyz), "radius": sphere.radius}
+            )
 
         print(f"  • Links with spheres: {list(collision_spheres.keys())}")
         for link, spheres in collision_spheres.items():

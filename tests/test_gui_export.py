@@ -22,7 +22,9 @@ def test_gui_export():
 
         # Create test spheres
         sphere1 = app.sphere_store.add("panda_link0", xyz=(0.1, 0.0, 0.0), radius=0.05)
-        sphere2 = app.sphere_store.add("panda_link3", xyz=(-0.05, 0.1, 0.02), radius=0.03)
+        sphere2 = app.sphere_store.add(
+            "panda_link3", xyz=(-0.05, 0.1, 0.02), radius=0.03
+        )
         app._create_sphere_visualization(sphere1)
         app._create_sphere_visualization(sphere2)
 
@@ -47,7 +49,9 @@ def test_gui_export():
                 else:
                     center = [float(x) for x in center]
 
-                collision_spheres[sphere.link].append({"center": center, "radius": float(sphere.radius)})
+                collision_spheres[sphere.link].append(
+                    {"center": center, "radius": float(sphere.radius)}
+                )
 
             # Add metadata for import (ensure clean Python types)
             data = {
@@ -55,12 +59,16 @@ def test_gui_export():
                 "metadata": {
                     "total_spheres": int(len(app.sphere_store.by_id)),
                     "links": list(collision_spheres.keys()),
-                    "export_timestamp": float(1699123456.789),  # Fixed timestamp for testing
+                    "export_timestamp": float(
+                        1699123456.789
+                    ),  # Fixed timestamp for testing
                 },
             }
 
             output_path = Path("test_spherization.yml")
-            output_path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+            output_path.write_text(
+                yaml.dump(data, default_flow_style=False, sort_keys=False)
+            )
             print(f"✅ YAML exported to: {output_path.absolute()}")
 
             # Verify the file content is clean
@@ -86,11 +94,11 @@ def test_gui_export():
         # Test URDF export
         print("📋 Testing URDF Export:")
         try:
-            from bubblify.core import inject_spheres_into_urdf_xml
+            from bubblify.core import inject_geometries_into_urdf_xml
 
-            urdf_xml = inject_spheres_into_urdf_xml(None, app.urdf, app.sphere_store)
+            urdf_xml = inject_geometries_into_urdf_xml(None, app.urdf, app.sphere_store)
 
-            urdf_output_path = Path("test_spherized.urdf")
+            urdf_output_path = Path("test_geometries.urdf")
             urdf_output_path.write_text(urdf_xml)
             print(f"✅ URDF exported to: {urdf_output_path.absolute()}")
 

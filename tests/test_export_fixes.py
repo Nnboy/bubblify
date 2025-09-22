@@ -26,7 +26,9 @@ def test_export_fixes():
         # Create test spheres with different coordinate types
         print("🔧 Creating Test Spheres:")
         sphere1 = app.sphere_store.add("panda_link0", xyz=(0.1, 0.0, 0.0), radius=0.05)
-        sphere2 = app.sphere_store.add("panda_link1", xyz=(-0.05, 0.1, 0.02), radius=0.03)
+        sphere2 = app.sphere_store.add(
+            "panda_link1", xyz=(-0.05, 0.1, 0.02), radius=0.03
+        )
 
         app._create_sphere_visualization(sphere1)
         app._create_sphere_visualization(sphere2)
@@ -50,7 +52,9 @@ def test_export_fixes():
             else:
                 center = [float(x) for x in center]
 
-            collision_spheres[sphere.link].append({"center": center, "radius": float(sphere.radius)})
+            collision_spheres[sphere.link].append(
+                {"center": center, "radius": float(sphere.radius)}
+            )
 
         # Test YAML serialization
         test_data = {
@@ -68,9 +72,9 @@ def test_export_fixes():
         # Test URDF export function
         print("🔧 Testing URDF Export Function:")
         try:
-            from bubblify.core import inject_spheres_into_urdf_xml
+            from bubblify.core import inject_geometries_into_urdf_xml
 
-            urdf_xml = inject_spheres_into_urdf_xml(None, app.urdf, app.sphere_store)
+            urdf_xml = inject_geometries_into_urdf_xml(None, app.urdf, app.sphere_store)
             print("✅ URDF XML generation successful")
             print(f"  • XML length: {len(urdf_xml)} characters")
             print(f"  • Contains sphere elements: {'<sphere' in urdf_xml}")

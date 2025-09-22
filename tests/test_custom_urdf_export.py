@@ -22,7 +22,8 @@ def test_custom_urdf_export():
 
         # Create a simple test URDF
         test_urdf_path = temp_path / "my_robot.urdf"
-        test_urdf_path.write_text("""<?xml version="1.0"?>
+        test_urdf_path.write_text(
+            """<?xml version="1.0"?>
 <robot name="my_robot">
   <link name="base_link">
     <visual>
@@ -43,7 +44,8 @@ def test_custom_urdf_export():
     <child link="link1"/>
     <origin xyz="0 0 0.1"/>
   </joint>
-</robot>""")
+</robot>"""
+        )
 
         try:
             print(f"🤖 Loading URDF from: {test_urdf_path}")
@@ -56,13 +58,15 @@ def test_custom_urdf_export():
             print()
 
             # Create a test sphere
-            sphere = app.sphere_store.add("base_link", xyz=(0.0, 0.0, 0.05), radius=0.03)
+            sphere = app.sphere_store.add(
+                "base_link", xyz=(0.0, 0.0, 0.05), radius=0.03
+            )
             app._create_sphere_visualization(sphere)
             print(f"⚪ Created test sphere: {sphere.id}")
             print()
 
             # Test export name generation
-            expected_name = f"{test_urdf_path.stem}_spherized"
+            expected_name = f"{test_urdf_path.stem}_geometries"
             print(f"🏷️ Expected export name: {expected_name}")
             print()
 
@@ -78,7 +82,9 @@ def test_custom_urdf_export():
 
                 print(f"  • YAML would export to: {yaml_path}")
                 print(f"  • URDF would export to: {urdf_path}")
-                print(f"  • Both in same directory as original: {export_dir == test_urdf_path.parent}")
+                print(
+                    f"  • Both in same directory as original: {export_dir == test_urdf_path.parent}"
+                )
             else:
                 print("  ❌ No URDF path found")
                 return False

@@ -9,7 +9,7 @@ import tempfile
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from bubblify import BubblifyApp
-from bubblify.core import inject_spheres_into_urdf_xml
+from bubblify.core import inject_geometries_into_urdf_xml
 
 
 def test_urdf_export_improvements():
@@ -68,7 +68,9 @@ def test_urdf_export_improvements():
             app = BubblifyApp(urdf_path=test_urdf_path, show_collision=False, port=8103)
 
             # Create test spheres
-            sphere1 = app.sphere_store.add("base_link", xyz=(0.0, 0.0, 0.05), radius=0.03)
+            sphere1 = app.sphere_store.add(
+                "base_link", xyz=(0.0, 0.0, 0.05), radius=0.03
+            )
             sphere2 = app.sphere_store.add("link1", xyz=(0.0, 0.0, 0.1), radius=0.025)
             sphere3 = app.sphere_store.add("link1", xyz=(0.0, 0.0, -0.1), radius=0.02)
 
@@ -77,31 +79,45 @@ def test_urdf_export_improvements():
 
             # Test URDF export
             print("📋 Testing URDF Export:")
-            urdf_xml = inject_spheres_into_urdf_xml(test_urdf_path, app.urdf, app.sphere_store)
+            urdf_xml = inject_geometries_into_urdf_xml(
+                test_urdf_path, app.urdf, app.sphere_store
+            )
 
             # Verify XML declaration
-            has_xml_declaration = urdf_xml.startswith('<?xml version="1.0" encoding="utf-8"?>')
+            has_xml_declaration = urdf_xml.startswith(
+                '<?xml version="1.0" encoding="utf-8"?>'
+            )
             print(f"  ✅ XML declaration: {has_xml_declaration}")
 
             # Verify old collision elements are removed
             has_old_box_collision = '<box size="0.1 0.1 0.1"/>' in urdf_xml
-            has_old_cylinder_collision = '<cylinder radius="0.05" length="0.2"/>' in urdf_xml
+            has_old_cylinder_collision = (
+                '<cylinder radius="0.05" length="0.2"/>' in urdf_xml
+            )
             has_old_collision_names = 'name="old_collision"' in urdf_xml
 
             print(f"  ✅ Old box collision removed: {not has_old_box_collision}")
-            print(f"  ✅ Old cylinder collision removed: {not has_old_cylinder_collision}")
+            print(
+                f"  ✅ Old cylinder collision removed: {not has_old_cylinder_collision}"
+            )
             print(f"  ✅ Old collision names removed: {not has_old_collision_names}")
 
             # Verify new sphere collisions are added
             sphere_count = urdf_xml.count("<sphere")
             collision_count = urdf_xml.count('<collision name="sphere_')
 
-            print(f"  ✅ Sphere elements added: {sphere_count} (expected: {len(app.sphere_store.by_id)})")
-            print(f"  ✅ Sphere collisions added: {collision_count} (expected: {len(app.sphere_store.by_id)})")
+            print(
+                f"  ✅ Sphere elements added: {sphere_count} (expected: {len(app.sphere_store.by_id)})"
+            )
+            print(
+                f"  ✅ Sphere collisions added: {collision_count} (expected: {len(app.sphere_store.by_id)})"
+            )
 
             # Verify proper formatting
             has_proper_indentation = "\n  <link" in urdf_xml
-            has_collision_structure = '<collision name="sphere_' in urdf_xml and "<origin xyz=" in urdf_xml
+            has_collision_structure = (
+                '<collision name="sphere_' in urdf_xml and "<origin xyz=" in urdf_xml
+            )
 
             print(f"  ✅ Proper indentation: {has_proper_indentation}")
             print(f"  ✅ Complete collision structure: {has_collision_structure}")

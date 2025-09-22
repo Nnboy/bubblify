@@ -1,4 +1,4 @@
-"""Interactive GUI application for URDF spherization using Viser."""
+"""Interactive GUI application for URDF geometry configuration using Viser."""
 
 from __future__ import annotations
 
@@ -17,12 +17,12 @@ from .core import (
     Geometry,
     GeometryStore,
     inject_geometries_into_urdf_xml,
-    inject_spheres_into_urdf_xml,
+    inject_geometries_into_urdf_xml,
 )
 
 
 class BubblifyApp:
-    """Main application class for interactive URDF spherization."""
+    """Main application class for interactive URDF geometry configuration."""
 
     def __init__(
         self,
@@ -30,7 +30,7 @@ class BubblifyApp:
         urdf_path: Optional[Path] = None,
         show_collision: bool = False,
         port: int = 8080,
-        spherization_yml: Optional[Path] = None,
+        geometry_config: Optional[Path] = None,
     ):
         """Initialize the Bubblify application.
 
@@ -39,7 +39,7 @@ class BubblifyApp:
             urdf_path: Path to custom URDF file
             show_collision: Whether to show collision meshes
             port: Viser server port
-            spherization_yml: Path to existing spherization YAML file to load
+            geometry_config: Path to existing geometry configuration YAML file to load
         """
         self.server = viser.ViserServer(port=port)
         self.show_collision = show_collision
@@ -129,8 +129,8 @@ class BubblifyApp:
         self._update_mesh_visibility()
 
         # Load geometry configuration YAML if provided
-        if spherization_yml is not None:
-            self._load_geometry_config_yaml(spherization_yml)
+        if geometry_config is not None:
+            self._load_geometry_config_yaml(geometry_config)
 
         print(f"🎯 Bubblify server running at http://localhost:{port}")
         print("Use the GUI controls to add and edit collision geometries!")
@@ -569,9 +569,9 @@ class BubblifyApp:
         """Setup export functionality."""
         with self.server.gui.add_folder("💾 Export"):
             # Get default export names based on URDF
-            default_name = "spherized"
+            default_name = "geometries"
             if self.urdf_path and self.urdf_path.stem:
-                default_name = f"{self.urdf_path.stem}_spherized"
+                default_name = f"{self.urdf_path.stem}_geometries"
 
             # Export name configuration (no paths, just filenames)
             export_name_input = self.server.gui.add_text(
@@ -579,8 +579,8 @@ class BubblifyApp:
             )
 
             # Export options
-            export_yml_btn = self.server.gui.add_button("Export Spheres (YAML)")
-            export_urdf_btn = self.server.gui.add_button("Export URDF with Spheres")
+            export_yml_btn = self.server.gui.add_button("Export Geometries (YAML)")
+            export_urdf_btn = self.server.gui.add_button("Export URDF with Geometries")
 
             # Status with error details (read-only)
             export_status = self.server.gui.add_markdown("Ready to export")
@@ -588,7 +588,7 @@ class BubblifyApp:
 
             @export_yml_btn.on_click
             def _(_):
-                """Export sphere configuration to YAML."""
+                """Export geometry configuration to YAML."""
                 try:
                     import yaml
 
@@ -663,7 +663,9 @@ class BubblifyApp:
                         f"✅ Exported {len(self.geometry_store.by_id)} geometries"
                     )
                     export_details.content = f"Saved to: {output_path.name}"
-                    print(f"Exported spherization to {output_path.absolute()}")
+                    print(
+                        f"Exported geometry configuration to {output_path.absolute()}"
+                    )
 
                 except ImportError:
                     error_msg = "PyYAML not installed. Run: pip install PyYAML"
@@ -677,7 +679,7 @@ class BubblifyApp:
 
             @export_urdf_btn.on_click
             def _(_):
-                """Export URDF with collision spheres."""
+                """Export URDF with collision geometries."""
                 try:
                     urdf_xml = inject_geometries_into_urdf_xml(
                         self.urdf_path, self.urdf, self.geometry_store
@@ -693,7 +695,7 @@ class BubblifyApp:
                     output_path.write_text(urdf_xml)
                     export_status.content = f"✅ Exported URDF with {len(self.geometry_store.by_id)} geometries"
                     export_details.content = f"Saved to: {output_path.name}"
-                    print(f"Exported spherized URDF to {output_path.absolute()}")
+                    print(f"Exported URDF with geometries to {output_path.absolute()}")
 
                 except Exception as e:
                     export_status.content = f"❌ URDF export failed: {type(e).__name__}"

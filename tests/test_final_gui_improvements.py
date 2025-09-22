@@ -24,7 +24,8 @@ def test_final_gui_improvements():
 
         # Copy a URDF to test directory-based exports
         test_urdf_path = temp_path / "test_robot.urdf"
-        test_urdf_path.write_text("""<?xml version="1.0"?>
+        test_urdf_path.write_text(
+            """<?xml version="1.0"?>
 <robot name="test_robot">
   <link name="base_link"/>
   <link name="link1"/>
@@ -32,7 +33,8 @@ def test_final_gui_improvements():
     <parent link="base_link"/>
     <child link="link1"/>
   </joint>
-</robot>""")
+</robot>"""
+        )
 
         try:
             print(f"📁 Testing with URDF at: {test_urdf_path}")
@@ -48,7 +50,9 @@ def test_final_gui_improvements():
 
             # Test GUI field types
             print("🔧 Testing GUI Field Types:")
-            print(f"  • Has visibility dropdown: {hasattr(app, '_current_link_dropdown')}")
+            print(
+                f"  • Has visibility dropdown: {hasattr(app, '_current_link_dropdown')}"
+            )
             print(f"  • Has sphere editor dropdown: {hasattr(app, '_link_dropdown')}")
             print("  • Status fields use markdown (read-only)")
             print("  • Count fields use text (read-only)")
@@ -64,8 +68,12 @@ def test_final_gui_improvements():
 
             # Create test spheres
             print("⚪ Creating Test Spheres:")
-            sphere1 = app.sphere_store.add("panda_link0", xyz=(0.1, 0.0, 0.0), radius=0.05)
-            sphere2 = app.sphere_store.add("panda_link3", xyz=(-0.05, 0.1, 0.02), radius=0.03)
+            sphere1 = app.sphere_store.add(
+                "panda_link0", xyz=(0.1, 0.0, 0.0), radius=0.05
+            )
+            sphere2 = app.sphere_store.add(
+                "panda_link3", xyz=(-0.05, 0.1, 0.02), radius=0.03
+            )
             app._create_sphere_visualization(sphere1)
             app._create_sphere_visualization(sphere2)
             print(f"  • Created {len(app.sphere_store.by_id)} spheres")
@@ -76,11 +84,11 @@ def test_final_gui_improvements():
             if app.urdf_path:
                 print(f"  • URDF path: {app.urdf_path}")
                 print(f"  • Export directory would be: {app.urdf_path.parent}")
-                default_name = f"{app.urdf_path.stem}_spherized"
+                default_name = f"{app.urdf_path.stem}_geometries"
             else:
                 print("  • No URDF path (robot_descriptions)")
                 print(f"  • Export directory would be: {Path.cwd()}")
-                default_name = "spherized"
+                default_name = "geometries"
 
             print(f"  • Default export name: {default_name}")
             print()
@@ -88,9 +96,11 @@ def test_final_gui_improvements():
             # Test URDF formatting
             print("📋 Testing URDF Export Formatting:")
             try:
-                from bubblify.core import inject_spheres_into_urdf_xml
+                from bubblify.core import inject_geometries_into_urdf_xml
 
-                urdf_xml = inject_spheres_into_urdf_xml(None, app.urdf, app.sphere_store)
+                urdf_xml = inject_geometries_into_urdf_xml(
+                    None, app.urdf, app.sphere_store
+                )
 
                 print("✅ URDF XML generation successful")
                 print(f"  • XML length: {len(urdf_xml)} characters")

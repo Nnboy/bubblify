@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from bubblify import BubblifyApp
-from bubblify.core import inject_spheres_into_urdf_xml
+from bubblify.core import inject_geometries_into_urdf_xml
 
 
 def test_real_robot_urdf_export():
@@ -32,10 +32,12 @@ def test_real_robot_urdf_export():
 
         # Export URDF
         print("📋 Exporting URDF with collision cleanup:")
-        urdf_xml = inject_spheres_into_urdf_xml(None, app.urdf, app.sphere_store)
+        urdf_xml = inject_geometries_into_urdf_xml(None, app.urdf, app.sphere_store)
 
         # Verify XML structure
-        has_xml_declaration = urdf_xml.startswith('<?xml version="1.0" encoding="utf-8"?>')
+        has_xml_declaration = urdf_xml.startswith(
+            '<?xml version="1.0" encoding="utf-8"?>'
+        )
         sphere_count = urdf_xml.count("<sphere")
         collision_count = urdf_xml.count('<collision name="sphere_')
 
@@ -61,8 +63,12 @@ def test_real_robot_urdf_export():
                         old_collision_elements += 1
 
         print(f"  ✅ XML declaration: {has_xml_declaration}")
-        print(f"  ✅ Sphere elements: {sphere_count} (expected: {len(app.sphere_store.by_id)})")
-        print(f"  ✅ New sphere collisions: {collision_count} (expected: {len(app.sphere_store.by_id)})")
+        print(
+            f"  ✅ Sphere elements: {sphere_count} (expected: {len(app.sphere_store.by_id)})"
+        )
+        print(
+            f"  ✅ New sphere collisions: {collision_count} (expected: {len(app.sphere_store.by_id)})"
+        )
         print(f"  🧹 Old mesh collisions removed: {old_mesh_collisions == 0}")
         print(f"  🧹 Old collision elements removed: {old_collision_elements == 0}")
         print()
@@ -96,7 +102,9 @@ def test_real_robot_urdf_export():
             if link_start and link_end:
                 link_content = "\n".join(lines[link_start : link_end + 1])
                 link_sphere_count = link_content.count("<sphere")
-                expected_spheres = len([s for s in app.sphere_store.by_id.values() if s.link == link_name])
+                expected_spheres = len(
+                    [s for s in app.sphere_store.by_id.values() if s.link == link_name]
+                )
 
                 # Count actual collision elements in this link's XML section
                 link_collisions = link_content.count("<collision")
