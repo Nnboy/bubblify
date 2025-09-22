@@ -128,9 +128,9 @@ class BubblifyApp:
         # Initialize visibility states
         self._update_mesh_visibility()
 
-        # Load spherization YAML if provided
+        # Load geometry configuration YAML if provided
         if spherization_yml is not None:
-            self._load_spherization_yaml(spherization_yml)
+            self._load_geometry_config_yaml(spherization_yml)
 
         print(f"🎯 Bubblify server running at http://localhost:{port}")
         print("Use the GUI controls to add and edit collision geometries!")
@@ -449,6 +449,8 @@ class BubblifyApp:
                 geometry_type = geometry_type_dropdown.value
 
                 # Get current parameters based on geometry type
+                # For new geometries, use default values instead of current slider values
+                # to avoid inheriting properties from previously selected geometry
                 if geometry_type == "sphere":
                     geometry = self.geometry_store.add(
                         link_name,
@@ -461,15 +463,15 @@ class BubblifyApp:
                         link_name,
                         xyz=(0.0, 0.0, 0.0),
                         geometry_type="box",
-                        size=(box_length.value, box_width.value, box_height.value),
+                        size=(0.1, 0.1, 0.1),  # Default size instead of slider values
                     )
                 elif geometry_type == "cylinder":
                     geometry = self.geometry_store.add(
                         link_name,
                         xyz=(0.0, 0.0, 0.0),
                         geometry_type="cylinder",
-                        cylinder_radius=cylinder_radius.value,
-                        cylinder_height=cylinder_height.value,
+                        cylinder_radius=0.05,  # Default radius
+                        cylinder_height=0.1,  # Default height
                     )
 
                 self._create_geometry_visualization(geometry)
@@ -891,8 +893,13 @@ class BubblifyApp:
     def _remove_transform_control(self):
         """Remove the current transform control."""
         if self.transform_control is not None:
-            self.transform_control.remove()
-            self.transform_control = None
+            try:
+                self.transform_control.remove()
+            except Exception:
+                # Ignore errors if control is already removed
+                pass
+            finally:
+                self.transform_control = None
         self._remove_radius_gizmo()
         self._remove_box_resize_gizmos()
         self._remove_cylinder_height_gizmos()
@@ -900,8 +907,13 @@ class BubblifyApp:
     def _remove_radius_gizmo(self):
         """Remove the current radius gizmo."""
         if self.radius_gizmo is not None:
-            self.radius_gizmo.remove()
-            self.radius_gizmo = None
+            try:
+                self.radius_gizmo.remove()
+            except Exception:
+                # Ignore errors if gizmo is already removed
+                pass
+            finally:
+                self.radius_gizmo = None
 
     def _remove_box_resize_gizmos(self):
         """Remove all box resize gizmos."""
@@ -1028,7 +1040,7 @@ class BubblifyApp:
             wxyz=gizmo_rotation.wxyz,
             position=world_position,
             opacity=0.8,
-            depth_test=False,
+            # depth_test=False,
             translation_limits=translation_limits,
         )
 
@@ -1308,13 +1320,6 @@ class BubblifyApp:
             print(f"Error creating box rotation: {e}")
             box_rotation = tf.SO3.identity()
 
-        # Create gizmos for each axis (X, Y, Z)
-        # 负方向的gizmo轴方向会跟随box的姿态变化
-        # 计算每个轴的最大向内移动距离，防止穿过中心点
-        max_inward_x = -(length / 2 - 0.005)  # X轴最大向中心移动距离
-        max_inward_y = -(width / 2 - 0.005)  # Y轴最大向中心移动距离
-        max_inward_z = -(height / 2 - 0.005)  # Z轴最大向中心移动距离
-
         axes_info = [
             {
                 "name": "x_neg",
@@ -1410,7 +1415,7 @@ class BubblifyApp:
                 wxyz=gizmo_rotation.wxyz,
                 position=world_position,
                 opacity=0.8,
-                depth_test=False,
+                # depth_test=False,
                 translation_limits=translation_limits,  # 添加移动限制
             )
 
@@ -1682,16 +1687,16 @@ class BubblifyApp:
                 geometry.node.opacity = new_opacity
                 geometry.node.visible = new_opacity > 0.0
 
-    def _load_spherization_yaml(self, yaml_path: Path):
-        """Load sphere configuration from YAML file at startup."""
+    def _load_geometry_config_yaml(self, yaml_path: Path):
+        """Load geometry configuration from YAML file at startup."""
         try:
             import yaml
 
             if not yaml_path.exists():
-                print(f"⚠️  Spherization YAML file not found: {yaml_path}")
+                print(f"⚠️  Geometry configuration YAML file not found: {yaml_path}")
                 return
 
-            print(f"📥 Loading spherization from: {yaml_path}")
+            print(f"📥 Loading geometry configuration from: {yaml_path}")
             data = yaml.safe_load(yaml_path.read_text())
             collision_spheres = data.get("collision_spheres", {})
 
@@ -1750,13 +1755,13 @@ class BubblifyApp:
                         self._create_geometry_visualization(sphere)
                         total_loaded += 1
 
-            print(f"✅ Loaded {total_loaded} spheres from {yaml_path.name}")
+            print(f"✅ Loaded {total_loaded} geometries from {yaml_path.name}")
 
         except ImportError:
-            print("⚠️  PyYAML not installed. Cannot load spherization YAML.")
+            print("⚠️  PyYAML not installed. Cannot load geometry configuration YAML.")
             print("   Install with: pip install PyYAML")
         except Exception as e:
-            print(f"❌ Failed to load spherization YAML: {e}")
+            print(f"❌ Failed to load geometry configuration YAML: {e}")
 
     def _add_reference_grid(self):
         """Add a reference grid to the scene."""
