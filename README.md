@@ -40,7 +40,7 @@ bubblify --urdf_path path/to/your/robot.urdf
 ### Command Line Options
 
 - `--urdf_path` (required): Path to the URDF file to spherize
-- `--spherization_yml` (optional): Load an existing spherization configuration
+- `--geometry_config` (optional): Load an existing geometry configuration
 - `--port` (optional): Port for the web interface (default: 8080)
 - `--show_collision` (optional): Display collision meshes (default: False)
 
@@ -50,8 +50,8 @@ bubblify --urdf_path path/to/your/robot.urdf
 # Basic usage
 bubblify --urdf_path ./assets/xarm6/xarm6_rs.urdf
 
-# Load with existing spherization
-bubblify --urdf_path ./assets/xarm6/xarm6_rs.urdf --spherization_yml ./config/xarm6_spheres.yml
+# Load with existing geometry configuration
+bubblify --urdf_path ./assets/xarm6/xarm6_rs.urdf --geometry_config ./config/xarm6_spheres.yml
 
 # Custom port and show collision meshes
 bubblify --urdf_path ./robot.urdf --port 8081 --show_collision
