@@ -606,11 +606,3 @@ def inject_geometries_into_urdf_xml(
     # Add XML declaration and return
     xml_content = ET.tostring(root, encoding="unicode")
     return '<?xml version="1.0" encoding="utf-8"?>\n' + xml_content
-
-
-# For backward compatibility
-def inject_spheres_into_urdf_xml(
-    original_urdf_path: Optional[Path], urdf_obj: yourdfpy.URDF, store: GeometryStore
-) -> str:
-    """Backward compatibility wrapper for inject_geometries_into_urdf_xml."""
-    return inject_geometries_into_urdf_xml(original_urdf_path, urdf_obj, store)
