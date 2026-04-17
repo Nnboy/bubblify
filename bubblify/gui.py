@@ -299,6 +299,7 @@ class BubblifyApp:
                 cylinder_height = self.server.gui.add_slider("Height", min=0.01, max=0.5, step=0.001, initial_value=0.1)
                 # Capsule display option
                 cylinder_as_capsule = self.server.gui.add_checkbox("Display as Capsule", initial_value=False)
+                self.server.gui.add_markdown("⚠️ Capsule 仅用于显示，导出 URDF 时按 cylinder 处理")
                 self._cylinder_radius_slider = cylinder_radius
                 self._cylinder_height_slider = cylinder_height
                 self._cylinder_as_capsule_checkbox = cylinder_as_capsule
