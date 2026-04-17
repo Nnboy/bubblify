@@ -7,7 +7,7 @@ import itertools
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -20,6 +20,47 @@ from viser import transforms as tf
 
 # Type definitions for geometry types
 GeometryType = Literal["sphere", "box", "cylinder"]
+
+YAML_SCHEMA_VERSION = 1
+
+
+@dataclasses.dataclass
+class GeometrySpec:
+    """YAML 解析后的一条几何配置，尚未分配 id / 挂接 viser node。
+
+    Used on the load path: YAML -> List[GeometrySpec] -> caller turns each
+    spec into a Geometry via store.add(spec.link, **spec.to_store_kwargs())
+    and builds the viser visualization.
+
+    Note: Geometry.display_as_capsule is not serialized (runtime-only
+    display state), so GeometrySpec does not carry that field.
+    """
+
+    link: str
+    xyz: Tuple[float, float, float]
+    geometry_type: GeometryType
+    rpy: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    radius: Optional[float] = None
+    size: Optional[Tuple[float, float, float]] = None
+    cylinder_radius: Optional[float] = None
+    cylinder_height: Optional[float] = None
+
+    def to_store_kwargs(self) -> Dict[str, Any]:
+        """Return kwargs suitable for GeometryStore.add (None values omitted)."""
+        kwargs: Dict[str, Any] = {
+            "xyz": self.xyz,
+            "geometry_type": self.geometry_type,
+            "rpy": self.rpy,
+        }
+        if self.radius is not None:
+            kwargs["radius"] = self.radius
+        if self.size is not None:
+            kwargs["size"] = self.size
+        if self.cylinder_radius is not None:
+            kwargs["cylinder_radius"] = self.cylinder_radius
+        if self.cylinder_height is not None:
+            kwargs["cylinder_height"] = self.cylinder_height
+        return kwargs
 
 
 @dataclasses.dataclass
@@ -568,3 +609,142 @@ def inject_geometries_into_urdf_xml(original_urdf_path: Optional[Path], urdf_obj
     # Add XML declaration and return
     xml_content = ET.tostring(root, encoding="unicode")
     return '<?xml version="1.0" encoding="utf-8"?>\n' + xml_content
+
+
+def load_geometry_specs_from_yaml(path: Path) -> List[GeometrySpec]:
+    """Read a YAML file and return a list of GeometrySpec.
+
+    Only the new format (top-level `collision_geometries` key) is accepted.
+
+    Raises:
+        FileNotFoundError: file does not exist
+        ValueError: missing `collision_geometries`, missing required fields,
+                    or unknown `type`
+    """
+    import yaml
+
+    if not path.exists():
+        raise FileNotFoundError(f"YAML file not found: {path}")
+
+    data = yaml.safe_load(path.read_text()) or {}
+    if "collision_geometries" not in data:
+        raise ValueError(f"YAML missing required top-level key 'collision_geometries': {path}")
+
+    specs: List[GeometrySpec] = []
+    for link_name, entries in (data["collision_geometries"] or {}).items():
+        for entry in entries or []:
+            specs.append(_parse_geometry_entry(link_name, entry))
+    return specs
+
+
+def _parse_geometry_entry(link: str, entry: Dict[str, Any]) -> GeometrySpec:
+    """Parse a single YAML entry under collision_geometries into GeometrySpec."""
+    if "center" not in entry:
+        raise ValueError(f"link={link}: entry missing 'center'")
+    if "type" not in entry:
+        raise ValueError(f"link={link}: entry missing 'type'")
+
+    geom_type = entry["type"]
+    if geom_type not in ("sphere", "box", "cylinder"):
+        raise ValueError(f"link={link}: unknown geometry type '{geom_type}'")
+
+    xyz = tuple(entry["center"])
+    rpy = tuple(entry.get("rpy", [0.0, 0.0, 0.0]))
+
+    if geom_type == "sphere":
+        if "radius" not in entry:
+            raise ValueError(f"link={link}: sphere entry missing 'radius'")
+        return GeometrySpec(
+            link=link,
+            xyz=xyz,
+            geometry_type="sphere",
+            rpy=rpy,
+            radius=float(entry["radius"]),
+        )
+    if geom_type == "box":
+        if "size" not in entry:
+            raise ValueError(f"link={link}: box entry missing 'size'")
+        return GeometrySpec(
+            link=link,
+            xyz=xyz,
+            geometry_type="box",
+            rpy=rpy,
+            size=tuple(entry["size"]),
+        )
+    # cylinder
+    if "radius" not in entry or "height" not in entry:
+        raise ValueError(f"link={link}: cylinder entry missing 'radius' or 'height'")
+    return GeometrySpec(
+        link=link,
+        xyz=xyz,
+        geometry_type="cylinder",
+        rpy=rpy,
+        cylinder_radius=float(entry["radius"]),
+        cylinder_height=float(entry["height"]),
+    )
+
+
+def dump_geometries_to_yaml(
+    store: "GeometryStore",
+    path: Path,
+    *,
+    include_metadata: bool = True,
+) -> None:
+    """Serialize a GeometryStore to YAML.
+
+    This version writes BOTH `collision_geometries` (new) and
+    `collision_spheres` (legacy mirror) keys to preserve existing behavior
+    during the cleanup. The legacy mirror is removed in a later task.
+    """
+    import time
+
+    import yaml
+
+    collision_geometries: Dict[str, List[Dict[str, Any]]] = {}
+    for geometry in store.by_id.values():
+        collision_geometries.setdefault(geometry.link, []).append(_geometry_to_yaml_entry(geometry))
+
+    data: Dict[str, Any] = {
+        "collision_geometries": collision_geometries,
+        # Backward-compatible mirror; removed in a later cleanup task.
+        "collision_spheres": {
+            link: [g for g in geometries if g["type"] == "sphere"] for link, geometries in collision_geometries.items()
+        },
+    }
+
+    if include_metadata:
+        total_spheres = sum(1 for g in store.by_id.values() if g.geometry_type == "sphere")
+        data["metadata"] = {
+            "total_geometries": int(len(store.by_id)),
+            "total_spheres": int(total_spheres),
+            "links": list(collision_geometries.keys()),
+            "export_timestamp": float(time.time()),
+            "schema_version": YAML_SCHEMA_VERSION,
+        }
+
+    path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+
+
+def _geometry_to_yaml_entry(geometry: Geometry) -> Dict[str, Any]:
+    """Convert a single Geometry to a YAML entry dict."""
+    center = geometry.local_xyz
+    if hasattr(center, "tolist"):
+        center = center.tolist()
+    else:
+        center = [float(x) for x in center]
+
+    entry: Dict[str, Any] = {
+        "center": center,
+        "type": geometry.geometry_type,
+    }
+    if geometry.geometry_type != "sphere":
+        entry["rpy"] = [float(r) for r in geometry.local_rpy]
+
+    if geometry.geometry_type == "sphere":
+        entry["radius"] = float(geometry.radius)
+    elif geometry.geometry_type == "box":
+        entry["size"] = [float(s) for s in geometry.size]
+    elif geometry.geometry_type == "cylinder":
+        entry["radius"] = float(geometry.cylinder_radius)
+        entry["height"] = float(geometry.cylinder_height)
+    return entry

@@ -533,76 +533,20 @@ class BubblifyApp:
             def _(_):
                 """Export geometry configuration to YAML."""
                 try:
-                    import yaml
-
-                    # Create data structure for all geometry types
-                    collision_geometries = {}
-                    for geometry in self.geometry_store.by_id.values():
-                        if geometry.link not in collision_geometries:
-                            collision_geometries[geometry.link] = []
-
-                        # Ensure clean conversion to Python primitives
-                        center = geometry.local_xyz
-                        if hasattr(center, "tolist"):
-                            center = center.tolist()
-                        else:
-                            center = [float(x) for x in center]
-
-                        # Create geometry data based on type
-                        geometry_data = {
-                            "center": center,
-                            "type": geometry.geometry_type,
-                        }
-
-                        # Only add rotation for non-sphere geometries
-                        if geometry.geometry_type != "sphere":
-                            geometry_data["rpy"] = [float(r) for r in geometry.local_rpy]
-
-                        if geometry.geometry_type == "sphere":
-                            geometry_data["radius"] = float(geometry.radius)
-                        elif geometry.geometry_type == "box":
-                            geometry_data["size"] = [float(s) for s in geometry.size]
-                        elif geometry.geometry_type == "cylinder":
-                            geometry_data["radius"] = float(geometry.cylinder_radius)
-                            geometry_data["height"] = float(geometry.cylinder_height)
-
-                        collision_geometries[geometry.link].append(geometry_data)
-
-                    # Add metadata for import (ensure clean Python types)
-                    data = {
-                        "collision_geometries": collision_geometries,
-                        # Keep backward compatibility
-                        "collision_spheres": {
-                            link: [g for g in geometries if g["type"] == "sphere"]
-                            for link, geometries in collision_geometries.items()
-                        },
-                        "metadata": {
-                            "total_geometries": int(len(self.geometry_store.by_id)),
-                            "total_spheres": int(
-                                sum(1 for g in self.geometry_store.by_id.values() if g.geometry_type == "sphere")
-                            ),
-                            "links": list(collision_geometries.keys()),
-                            "export_timestamp": float(time.time()),
-                        },
-                    }
-
-                    # Determine output directory (same as URDF or current working directory)
+                    # Determine output directory (same as URDF or cwd)
                     if self.urdf_path and self.urdf_path.parent:
                         output_dir = self.urdf_path.parent
                     else:
                         output_dir = Path.cwd()
-
                     output_path = output_dir / f"{export_name_input.value}.yml"
-                    output_path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+
+                    from .core import dump_geometries_to_yaml
+
+                    dump_geometries_to_yaml(self.geometry_store, output_path)
+
                     export_status.content = f"✅ Exported {len(self.geometry_store.by_id)} geometries"
                     export_details.content = f"Saved to: {output_path.name}"
                     print(f"Exported geometry configuration to {output_path.absolute()}")
-
-                except ImportError:
-                    error_msg = "PyYAML not installed. Run: pip install PyYAML"
-                    export_status.content = "❌ Missing dependency"
-                    export_details.content = error_msg
-                    print(f"Export failed: {error_msg}")
                 except Exception as e:
                     export_status.content = f"❌ Export failed: {type(e).__name__}"
                     export_details.content = str(e)
@@ -1534,80 +1478,50 @@ class BubblifyApp:
                 geometry.node.visible = new_opacity > 0.0
 
     def _load_geometry_config_yaml(self, yaml_path: Path):
-        """Load geometry configuration from YAML file at startup."""
+        """Load geometry configuration from YAML file at startup.
+
+        Prefers the new format via core.load_geometry_specs_from_yaml. If that
+        raises ValueError (typically: old-format file with only the
+        `collision_spheres` key), falls back to reading the legacy format
+        directly. The fallback branch is removed in a later cleanup task.
+        """
+        from .core import load_geometry_specs_from_yaml
+
+        if not yaml_path.exists():
+            print(f"⚠️  Geometry configuration YAML file not found: {yaml_path}")
+            return
+
+        print(f"📥 Loading geometry configuration from: {yaml_path}")
+        total_loaded = 0
+
         try:
+            specs = load_geometry_specs_from_yaml(yaml_path)
+        except ValueError:
+            # Legacy-format fallback; removed in a later cleanup task.
             import yaml
 
-            if not yaml_path.exists():
-                print(f"⚠️  Geometry configuration YAML file not found: {yaml_path}")
-                return
-
-            print(f"📥 Loading geometry configuration from: {yaml_path}")
-            data = yaml.safe_load(yaml_path.read_text())
-            collision_spheres = data.get("collision_spheres", {})
-
-            # Import spheres and geometries
-            total_loaded = 0
-
-            # Try to load new format with collision_geometries first
-            collision_data = data.get("collision_geometries", {})
-            if collision_data:
-                for link_name, geometries_data in collision_data.items():
-                    for geom_data in geometries_data:
-                        # Extract rotation if available
-                        rpy = tuple(geom_data.get("rpy", [0.0, 0.0, 0.0]))
-
-                        # Determine geometry type and parameters
-                        geom_type = geom_data.get("type", "sphere")
-
-                        if geom_type == "sphere":
-                            geometry = self.geometry_store.add(
-                                link_name,
-                                xyz=tuple(geom_data["center"]),
-                                geometry_type="sphere",
-                                radius=geom_data["radius"],
-                                rpy=rpy,
-                            )
-                        elif geom_type == "box":
-                            geometry = self.geometry_store.add(
-                                link_name,
-                                xyz=tuple(geom_data["center"]),
-                                geometry_type="box",
-                                size=tuple(geom_data["size"]),
-                                rpy=rpy,
-                            )
-                        elif geom_type == "cylinder":
-                            geometry = self.geometry_store.add(
-                                link_name,
-                                xyz=tuple(geom_data["center"]),
-                                geometry_type="cylinder",
-                                cylinder_radius=geom_data["radius"],
-                                cylinder_height=geom_data["height"],
-                                rpy=rpy,
-                            )
-
-                        self._create_geometry_visualization(geometry)
-                        total_loaded += 1
-            else:
-                # Fallback to old format with collision_spheres
-                for link_name, spheres_data in collision_spheres.items():
-                    for sphere_data in spheres_data:
-                        # Old format - only spheres, no rotation
-                        sphere = self.geometry_store.add(
-                            link_name,
-                            xyz=tuple(sphere_data["center"]),
-                            radius=sphere_data["radius"],
-                        )
-                        self._create_geometry_visualization(sphere)
-                        total_loaded += 1
-
-            print(f"✅ Loaded {total_loaded} geometries from {yaml_path.name}")
-
-        except ImportError:
-            print("⚠️  PyYAML not installed. Cannot load geometry configuration YAML.")
-            print("   Install with: pip install PyYAML")
+            data = yaml.safe_load(yaml_path.read_text()) or {}
+            for link_name, spheres_data in (data.get("collision_spheres") or {}).items():
+                for sphere_data in spheres_data:
+                    geometry = self.geometry_store.add(
+                        link_name,
+                        xyz=tuple(sphere_data["center"]),
+                        radius=sphere_data["radius"],
+                    )
+                    self._create_geometry_visualization(geometry)
+                    total_loaded += 1
+            print(f"✅ Loaded {total_loaded} geometries from {yaml_path.name} (legacy format)")
+            return
         except Exception as e:
             print(f"❌ Failed to load geometry configuration YAML: {e}")
+            return
+
+        for spec in specs:
+            geometry = self.geometry_store.add(spec.link, **spec.to_store_kwargs())
+            self._create_geometry_visualization(geometry)
+            total_loaded += 1
+
+        print(f"✅ Loaded {total_loaded} geometries from {yaml_path.name}")
 
     def _add_reference_grid(self):
         """Add a reference grid to the scene."""
