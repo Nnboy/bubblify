@@ -692,9 +692,9 @@ def dump_geometries_to_yaml(
 ) -> None:
     """Serialize a GeometryStore to YAML.
 
-    This version writes BOTH `collision_geometries` (new) and
-    `collision_spheres` (legacy mirror) keys to preserve existing behavior
-    during the cleanup. The legacy mirror is removed in a later task.
+    Writes only the new-format `collision_geometries` key plus optional
+    metadata. Old-format files that used only a legacy mirror key are no
+    longer supported; re-export through the GUI to upgrade.
     """
     import time
 
@@ -706,17 +706,11 @@ def dump_geometries_to_yaml(
 
     data: Dict[str, Any] = {
         "collision_geometries": collision_geometries,
-        # Backward-compatible mirror; removed in a later cleanup task.
-        "collision_spheres": {
-            link: [g for g in geometries if g["type"] == "sphere"] for link, geometries in collision_geometries.items()
-        },
     }
 
     if include_metadata:
-        total_spheres = sum(1 for g in store.by_id.values() if g.geometry_type == "sphere")
         data["metadata"] = {
             "total_geometries": int(len(store.by_id)),
-            "total_spheres": int(total_spheres),
             "links": list(collision_geometries.keys()),
             "export_timestamp": float(time.time()),
             "schema_version": YAML_SCHEMA_VERSION,

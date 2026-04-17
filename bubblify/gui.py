@@ -1478,13 +1478,7 @@ class BubblifyApp:
                 geometry.node.visible = new_opacity > 0.0
 
     def _load_geometry_config_yaml(self, yaml_path: Path):
-        """Load geometry configuration from YAML file at startup.
-
-        Prefers the new format via core.load_geometry_specs_from_yaml. If that
-        raises ValueError (typically: old-format file with only the
-        `collision_spheres` key), falls back to reading the legacy format
-        directly. The fallback branch is removed in a later cleanup task.
-        """
+        """Load geometry configuration from YAML file at startup."""
         from .core import load_geometry_specs_from_yaml
 
         if not yaml_path.exists():
@@ -1492,30 +1486,14 @@ class BubblifyApp:
             return
 
         print(f"📥 Loading geometry configuration from: {yaml_path}")
-        total_loaded = 0
 
         try:
             specs = load_geometry_specs_from_yaml(yaml_path)
-        except ValueError:
-            # Legacy-format fallback; removed in a later cleanup task.
-            import yaml
-
-            data = yaml.safe_load(yaml_path.read_text()) or {}
-            for link_name, spheres_data in (data.get("collision_spheres") or {}).items():
-                for sphere_data in spheres_data:
-                    geometry = self.geometry_store.add(
-                        link_name,
-                        xyz=tuple(sphere_data["center"]),
-                        radius=sphere_data["radius"],
-                    )
-                    self._create_geometry_visualization(geometry)
-                    total_loaded += 1
-            print(f"✅ Loaded {total_loaded} geometries from {yaml_path.name} (legacy format)")
-            return
         except Exception as e:
             print(f"❌ Failed to load geometry configuration YAML: {e}")
             return
 
+        total_loaded = 0
         for spec in specs:
             geometry = self.geometry_store.add(spec.link, **spec.to_store_kwargs())
             self._create_geometry_visualization(geometry)

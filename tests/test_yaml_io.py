@@ -88,11 +88,11 @@ def test_geometryspec_to_store_kwargs_omits_none():
     assert "cylinder_height" not in kw
 
 
-def test_dumped_yaml_still_has_collision_spheres_key(mixed_store, tmp_path):
-    """Task 4..6 state: dump writes both collision_geometries and
-    collision_spheres for backward compat; a later cleanup task flips this."""
+def test_dumped_yaml_has_no_legacy_collision_spheres_key(mixed_store, tmp_path):
+    """Cleanup: collision_spheres double-write is gone; metadata drops total_spheres."""
     path = tmp_path / "g.yml"
     dump_geometries_to_yaml(mixed_store, path)
     raw = yaml.safe_load(path.read_text())
     assert "collision_geometries" in raw
-    assert "collision_spheres" in raw
+    assert "collision_spheres" not in raw
+    assert "total_spheres" not in raw["metadata"]
