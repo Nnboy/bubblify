@@ -7,7 +7,7 @@ import itertools
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Literal
+from typing import Dict, List, Literal, Optional, Tuple
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -15,8 +15,8 @@ import trimesh
 import viser
 import yourdfpy
 from trimesh.scene import Scene
-
 from viser import transforms as tf
+
 
 # Type definitions for geometry types
 GeometryType = Literal["sphere", "box", "cylinder"]
@@ -65,9 +65,7 @@ class Geometry:
             return self.radius
         elif self.geometry_type == "box":
             # Use half the diagonal of the box as effective radius
-            return 0.5 * np.sqrt(
-                self.size[0] ** 2 + self.size[1] ** 2 + self.size[2] ** 2
-            )
+            return 0.5 * np.sqrt(self.size[0] ** 2 + self.size[1] ** 2 + self.size[2] ** 2)
         elif self.geometry_type == "cylinder":
             return self.cylinder_radius
         return self.radius
@@ -144,9 +142,7 @@ class GeometryStore:
         self._next_id = itertools.count(0)
         self.by_id: Dict[int, Geometry] = {}
         self.ids_by_link: Dict[str, List[int]] = {}
-        self.group_nodes: Dict[str, viser.FrameHandle] = (
-            {}
-        )  # /geometries/<link> parents
+        self.group_nodes: Dict[str, viser.FrameHandle] = {}  # /geometries/<link> parents
 
     def add(
         self,
@@ -248,12 +244,8 @@ class EnhancedViserUrdf:
         urdf_or_path: yourdfpy.URDF | Path,
         scale: float = 1.0,
         root_node_name: str = "/",
-        mesh_color_override: (
-            Tuple[float, float, float] | Tuple[float, float, float, float] | None
-        ) = None,
-        collision_mesh_color_override: (
-            Tuple[float, float, float] | Tuple[float, float, float, float] | None
-        ) = None,
+        mesh_color_override: (Tuple[float, float, float] | Tuple[float, float, float, float] | None) = None,
+        collision_mesh_color_override: (Tuple[float, float, float] | Tuple[float, float, float, float] | None) = None,
         load_meshes: bool = True,
         load_collision_meshes: bool = False,
     ) -> None:
@@ -355,17 +347,12 @@ class EnhancedViserUrdf:
         if self._visual_root_frame is not None:
             self._visual_root_frame.visible = visible
         else:
-            warnings.warn(
-                "Cannot set `.show_visual`, since no visual meshes were loaded."
-            )
+            warnings.warn("Cannot set `.show_visual`, since no visual meshes were loaded.")
 
     @property
     def show_collision(self) -> bool:
         """Returns whether the collision meshes are currently visible."""
-        return (
-            self._collision_root_frame is not None
-            and self._collision_root_frame.visible
-        )
+        return self._collision_root_frame is not None and self._collision_root_frame.visible
 
     @show_collision.setter
     def show_collision(self, visible: bool) -> None:
@@ -373,9 +360,7 @@ class EnhancedViserUrdf:
         if self._collision_root_frame is not None:
             self._collision_root_frame.visible = visible
         else:
-            warnings.warn(
-                "Cannot set `.show_collision`, since no collision meshes were loaded."
-            )
+            warnings.warn("Cannot set `.show_collision`, since no collision meshes were loaded.")
 
     def set_link_visible(self, link_name: str, visible: bool, which: str = "visual"):
         """Set visibility of a specific link's meshes."""
@@ -398,18 +383,14 @@ class EnhancedViserUrdf:
         self._urdf.update_cfg(configuration)
         for joint, frame_handle in zip(self._joint_map_values, self._joint_frames):
             assert isinstance(joint, yourdfpy.Joint)
-            T_parent_child = self._urdf.get_transform(
-                joint.child, joint.parent, collision_geometry=not self._load_meshes
-            )
+            T_parent_child = self._urdf.get_transform(joint.child, joint.parent, collision_geometry=not self._load_meshes)
             frame_handle.wxyz = tf.SO3.from_matrix(T_parent_child[:3, :3]).wxyz
             frame_handle.position = T_parent_child[:3, 3] * self._scale
 
     def get_actuated_joint_limits(self) -> dict[str, tuple[float | None, float | None]]:
         """Returns an ordered mapping from actuated joint names to position limits."""
         out: dict[str, tuple[float | None, float | None]] = {}
-        for joint_name, joint in zip(
-            self._urdf.actuated_joint_names, self._urdf.actuated_joints
-        ):
+        for joint_name, joint in zip(self._urdf.actuated_joint_names, self._urdf.actuated_joints):
             assert isinstance(joint_name, str)
             assert isinstance(joint, yourdfpy.Joint)
             if joint.limit is None:
@@ -431,16 +412,12 @@ class EnhancedViserUrdf:
         scene: Scene,
         root_node_name: str,
         collision_geometry: bool,
-        mesh_color_override: (
-            Tuple[float, float, float] | Tuple[float, float, float, float] | None
-        ),
+        mesh_color_override: (Tuple[float, float, float] | Tuple[float, float, float, float] | None),
     ) -> viser.FrameHandle:
         """Helper function to add joint frames and meshes to the ViserUrdf object."""
         prefix = "collision" if collision_geometry else "visual"
         prefixed_root_node_name = (f"{root_node_name}/{prefix}").replace("//", "/")
-        root_frame = self._target.scene.add_frame(
-            prefixed_root_node_name, show_axes=False
-        )
+        root_frame = self._target.scene.add_frame(prefixed_root_node_name, show_axes=False)
 
         # Add coordinate frame for each joint.
         for joint in self._urdf.joint_map.values():
@@ -520,9 +497,7 @@ def _viser_name_from_frame(
     return "/".join(frames[::-1])
 
 
-def inject_geometries_into_urdf_xml(
-    original_urdf_path: Optional[Path], urdf_obj: yourdfpy.URDF, store: GeometryStore
-) -> str:
+def inject_geometries_into_urdf_xml(original_urdf_path: Optional[Path], urdf_obj: yourdfpy.URDF, store: GeometryStore) -> str:
     """Inject collision geometries into URDF XML, replacing all existing collision elements."""
     if original_urdf_path is not None:
         root = ET.parse(original_urdf_path).getroot()
@@ -558,7 +533,7 @@ def inject_geometries_into_urdf_xml(
                 rpy_str = "0 0 0"
             else:
                 rpy_str = f"{geometry.local_rpy[0]} {geometry.local_rpy[1]} {geometry.local_rpy[2]}"
-            origin = ET.SubElement(
+            ET.SubElement(
                 coll,
                 "origin",
                 {

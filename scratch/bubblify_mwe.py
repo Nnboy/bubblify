@@ -25,7 +25,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Optional
+
 
 # Add the project root to Python path so we can import bubblify
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -67,9 +67,7 @@ Examples:
         help="Show collision meshes in addition to visual meshes",
     )
 
-    parser.add_argument(
-        "--port", type=int, default=8080, help="Viser server port (default: 8080)"
-    )
+    parser.add_argument("--port", type=int, default=8080, help="Viser server port (default: 8080)")
 
     parser.add_argument(
         "--geometry_config",
@@ -85,9 +83,7 @@ Examples:
         sys.exit(1)
 
     if args.geometry_config is not None and not args.geometry_config.exists():
-        print(
-            f"❌ Error: Geometry configuration YAML file not found: {args.geometry_config}"
-        )
+        print(f"❌ Error: Geometry configuration YAML file not found: {args.geometry_config}")
         sys.exit(1)
 
     # Welcome message

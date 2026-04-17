@@ -111,9 +111,7 @@ class BubblifyApp:
         self.other_links_geometries_opacity: float = 0.2
 
         # Create geometry root frame
-        self.geometries_root = self.server.scene.add_frame(
-            "/geometries", show_axes=False
-        )
+        self.geometries_root = self.server.scene.add_frame("/geometries", show_axes=False)
 
         # Setup GUI
         self._setup_robot_controls()
@@ -146,9 +144,7 @@ class BubblifyApp:
             ) in self.urdf_viz.get_actuated_joint_limits().items():
                 lower = lower if lower is not None else -np.pi
                 upper = upper if upper is not None else np.pi
-                initial_pos = (
-                    0.0 if lower < -0.1 and upper > 0.1 else (lower + upper) / 2.0
-                )
+                initial_pos = 0.0 if lower < -0.1 and upper > 0.1 else (lower + upper) / 2.0
 
                 slider = self.server.gui.add_slider(
                     label=joint_name,
@@ -186,17 +182,11 @@ class BubblifyApp:
             all_links = self.urdf_viz.get_all_link_names()
             if not all_links:
                 all_links = ["base_link"]
-            current_link_dropdown = self.server.gui.add_dropdown(
-                "Current Link", options=all_links, initial_value=all_links[0]
-            )
+            current_link_dropdown = self.server.gui.add_dropdown("Current Link", options=all_links, initial_value=all_links[0])
 
             # Mesh visibility toggles
-            show_selected_link_cb = self.server.gui.add_checkbox(
-                "Show Selected Link", initial_value=self.show_selected_link
-            )
-            show_other_links_cb = self.server.gui.add_checkbox(
-                "Show Other Links", initial_value=self.show_other_links
-            )
+            show_selected_link_cb = self.server.gui.add_checkbox("Show Selected Link", initial_value=self.show_selected_link)
+            show_other_links_cb = self.server.gui.add_checkbox("Show Other Links", initial_value=self.show_other_links)
 
             # Geometry opacity controls for visual focus system
             selected_geometry_opacity = self.server.gui.add_slider(
@@ -255,9 +245,7 @@ class BubblifyApp:
 
             @other_links_geometries_opacity.on_update
             def _(_):
-                self.other_links_geometries_opacity = (
-                    other_links_geometries_opacity.value
-                )
+                self.other_links_geometries_opacity = other_links_geometries_opacity.value
                 self._update_geometry_opacities()
 
     def _setup_geometry_controls(self):
@@ -269,9 +257,7 @@ class BubblifyApp:
                 all_links = ["base_link"]
 
             # Link selection
-            link_dropdown = self.server.gui.add_dropdown(
-                "Link", options=all_links, initial_value=all_links[0]
-            )
+            link_dropdown = self.server.gui.add_dropdown("Link", options=all_links, initial_value=all_links[0])
             self.current_link = link_dropdown.value
             self._link_dropdown = link_dropdown  # Store reference for syncing
 
@@ -284,9 +270,7 @@ class BubblifyApp:
             self._geometry_type_dropdown = geometry_type_dropdown
 
             # Geometry selection dropdown (will be populated based on selected link)
-            geometry_dropdown = self.server.gui.add_dropdown(
-                "Geometry", options=["None"], initial_value="None"
-            )
+            geometry_dropdown = self.server.gui.add_dropdown("Geometry", options=["None"], initial_value="None")
             self._geometry_dropdown = geometry_dropdown  # Store reference
 
             # Geometry creation and deletion
@@ -294,74 +278,40 @@ class BubblifyApp:
             delete_geometry_btn = self.server.gui.add_button("🗑️ Delete Selected")
 
             # Geometry statistics
-            total_geometry_count = self.server.gui.add_text(
-                "Total Geometries", initial_value="0"
-            )
-            link_geometry_count = self.server.gui.add_text(
-                "Geometries on Current Link", initial_value="0"
-            )
+            self.server.gui.add_text("Total Geometries", initial_value="0")
+            self.server.gui.add_text("Geometries on Current Link", initial_value="0")
 
             # Geometry properties - Sphere
-            with self.server.gui.add_folder(
-                "⚪ Sphere Properties", expand_by_default=True
-            ):
-                sphere_radius = self.server.gui.add_slider(
-                    "Radius", min=0.005, max=0.14, step=0.001, initial_value=0.05
-                )
+            with self.server.gui.add_folder("⚪ Sphere Properties", expand_by_default=True):
+                sphere_radius = self.server.gui.add_slider("Radius", min=0.005, max=0.14, step=0.001, initial_value=0.05)
                 self._sphere_radius_slider = sphere_radius
 
             # Geometry properties - Box
-            with self.server.gui.add_folder(
-                "📦 Box Properties", expand_by_default=False
-            ):
-                box_length = self.server.gui.add_slider(
-                    "Length", min=0.01, max=0.5, step=0.001, initial_value=0.1
-                )
-                box_width = self.server.gui.add_slider(
-                    "Width", min=0.01, max=0.5, step=0.001, initial_value=0.1
-                )
-                box_height = self.server.gui.add_slider(
-                    "Height", min=0.01, max=0.5, step=0.001, initial_value=0.1
-                )
+            with self.server.gui.add_folder("📦 Box Properties", expand_by_default=False):
+                box_length = self.server.gui.add_slider("Length", min=0.01, max=0.5, step=0.001, initial_value=0.1)
+                box_width = self.server.gui.add_slider("Width", min=0.01, max=0.5, step=0.001, initial_value=0.1)
+                box_height = self.server.gui.add_slider("Height", min=0.01, max=0.5, step=0.001, initial_value=0.1)
                 self._box_size_sliders = (box_length, box_width, box_height)
 
             # Geometry properties - Cylinder
-            with self.server.gui.add_folder(
-                "🥫 Cylinder Properties", expand_by_default=False
-            ):
-                cylinder_radius = self.server.gui.add_slider(
-                    "Radius", min=0.005, max=0.14, step=0.001, initial_value=0.05
-                )
-                cylinder_height = self.server.gui.add_slider(
-                    "Height", min=0.01, max=0.5, step=0.001, initial_value=0.1
-                )
+            with self.server.gui.add_folder("🥫 Cylinder Properties", expand_by_default=False):
+                cylinder_radius = self.server.gui.add_slider("Radius", min=0.005, max=0.14, step=0.001, initial_value=0.05)
+                cylinder_height = self.server.gui.add_slider("Height", min=0.01, max=0.5, step=0.001, initial_value=0.1)
                 # Capsule display option
-                cylinder_as_capsule = self.server.gui.add_checkbox(
-                    "Display as Capsule", initial_value=False
-                )
+                cylinder_as_capsule = self.server.gui.add_checkbox("Display as Capsule", initial_value=False)
                 self._cylinder_radius_slider = cylinder_radius
                 self._cylinder_height_slider = cylinder_height
                 self._cylinder_as_capsule_checkbox = cylinder_as_capsule
 
             # Common properties
-            geometry_color = self.server.gui.add_rgb(
-                "Color", initial_value=(255, 180, 60)
-            )
+            geometry_color = self.server.gui.add_rgb("Color", initial_value=(255, 180, 60))
             self._geometry_color_input = geometry_color
 
             # Rotation properties
-            with self.server.gui.add_folder(
-                "🔄 Rotation Properties", expand_by_default=False
-            ):
-                roll_slider = self.server.gui.add_slider(
-                    "Roll (X)", min=-3.14159, max=3.14159, step=0.01, initial_value=0.0
-                )
-                pitch_slider = self.server.gui.add_slider(
-                    "Pitch (Y)", min=-3.14159, max=3.14159, step=0.01, initial_value=0.0
-                )
-                yaw_slider = self.server.gui.add_slider(
-                    "Yaw (Z)", min=-3.14159, max=3.14159, step=0.01, initial_value=0.0
-                )
+            with self.server.gui.add_folder("🔄 Rotation Properties", expand_by_default=False):
+                roll_slider = self.server.gui.add_slider("Roll (X)", min=-3.14159, max=3.14159, step=0.01, initial_value=0.0)
+                pitch_slider = self.server.gui.add_slider("Pitch (Y)", min=-3.14159, max=3.14159, step=0.01, initial_value=0.0)
+                yaw_slider = self.server.gui.add_slider("Yaw (Z)", min=-3.14159, max=3.14159, step=0.01, initial_value=0.0)
                 self._rpy_sliders = (roll_slider, pitch_slider, yaw_slider)
 
             def update_geometry_dropdown():
@@ -378,9 +328,7 @@ class BubblifyApp:
                     geometry_to_select = None
                     if self.current_geometry_id is not None:
                         # Try to keep current selection if it's still valid for this link
-                        current_geometry = self.geometry_store.by_id.get(
-                            self.current_geometry_id
-                        )
+                        current_geometry = self.geometry_store.by_id.get(self.current_geometry_id)
                         if current_geometry and current_geometry.link == link_name:
                             geometry_to_select = current_geometry
 
@@ -504,10 +452,7 @@ class BubblifyApp:
                 if self._updating_geometry_ui:
                     return
 
-                if (
-                    self.current_geometry_id is not None
-                    and self.current_geometry_id in self.geometry_store.by_id
-                ):
+                if self.current_geometry_id is not None and self.current_geometry_id in self.geometry_store.by_id:
                     geometry = self.geometry_store.by_id[self.current_geometry_id]
 
                     # Update properties based on geometry type
@@ -573,9 +518,7 @@ class BubblifyApp:
                 default_name = f"{self.urdf_path.stem}_geometries"
 
             # Export name configuration (no paths, just filenames)
-            export_name_input = self.server.gui.add_text(
-                "Export Name", initial_value=default_name
-            )
+            export_name_input = self.server.gui.add_text("Export Name", initial_value=default_name)
 
             # Export options
             export_yml_btn = self.server.gui.add_button("Export Geometries (YAML)")
@@ -612,9 +555,7 @@ class BubblifyApp:
 
                         # Only add rotation for non-sphere geometries
                         if geometry.geometry_type != "sphere":
-                            geometry_data["rpy"] = [
-                                float(r) for r in geometry.local_rpy
-                            ]
+                            geometry_data["rpy"] = [float(r) for r in geometry.local_rpy]
 
                         if geometry.geometry_type == "sphere":
                             geometry_data["radius"] = float(geometry.radius)
@@ -637,11 +578,7 @@ class BubblifyApp:
                         "metadata": {
                             "total_geometries": int(len(self.geometry_store.by_id)),
                             "total_spheres": int(
-                                sum(
-                                    1
-                                    for g in self.geometry_store.by_id.values()
-                                    if g.geometry_type == "sphere"
-                                )
+                                sum(1 for g in self.geometry_store.by_id.values() if g.geometry_type == "sphere")
                             ),
                             "links": list(collision_geometries.keys()),
                             "export_timestamp": float(time.time()),
@@ -655,16 +592,10 @@ class BubblifyApp:
                         output_dir = Path.cwd()
 
                     output_path = output_dir / f"{export_name_input.value}.yml"
-                    output_path.write_text(
-                        yaml.dump(data, default_flow_style=False, sort_keys=False)
-                    )
-                    export_status.content = (
-                        f"✅ Exported {len(self.geometry_store.by_id)} geometries"
-                    )
+                    output_path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+                    export_status.content = f"✅ Exported {len(self.geometry_store.by_id)} geometries"
                     export_details.content = f"Saved to: {output_path.name}"
-                    print(
-                        f"Exported geometry configuration to {output_path.absolute()}"
-                    )
+                    print(f"Exported geometry configuration to {output_path.absolute()}")
 
                 except ImportError:
                     error_msg = "PyYAML not installed. Run: pip install PyYAML"
@@ -680,9 +611,7 @@ class BubblifyApp:
             def _(_):
                 """Export URDF with collision geometries."""
                 try:
-                    urdf_xml = inject_geometries_into_urdf_xml(
-                        self.urdf_path, self.urdf, self.geometry_store
-                    )
+                    urdf_xml = inject_geometries_into_urdf_xml(self.urdf_path, self.urdf, self.geometry_store)
 
                     # Determine output directory (same as URDF or current working directory)
                     if self.urdf_path and self.urdf_path.parent:
@@ -708,17 +637,13 @@ class BubblifyApp:
             # Get the link frame from enhanced URDF
             link_frame = self.urdf_viz.link_frame.get(geometry.link)
             if link_frame is not None:
-                self.geometry_store.group_nodes[geometry.link] = (
-                    self.server.scene.add_frame(
-                        f"{link_frame.name}/geometries", show_axes=False
-                    )
+                self.geometry_store.group_nodes[geometry.link] = self.server.scene.add_frame(
+                    f"{link_frame.name}/geometries", show_axes=False
                 )
             else:
                 # Fallback: create under geometries root
-                self.geometry_store.group_nodes[geometry.link] = (
-                    self.server.scene.add_frame(
-                        f"/geometries/{geometry.link}", show_axes=False
-                    )
+                self.geometry_store.group_nodes[geometry.link] = self.server.scene.add_frame(
+                    f"/geometries/{geometry.link}", show_axes=False
                 )
 
         parent_frame = self.geometry_store.group_nodes[geometry.link]
@@ -750,7 +675,6 @@ class BubblifyApp:
         elif geometry.geometry_type == "cylinder":
             # Viser doesn't have add_cylinder, so we'll create a cylinder mesh using trimesh
             import trimesh
-            import numpy as np
 
             if geometry.display_as_capsule:
                 # Create a capsule using Trimesh's built-in capsule method
@@ -794,13 +718,9 @@ class BubblifyApp:
                 # IMPORTANT: Don't call update_geometry_dropdown here as it will override our selection
                 # Instead, manually update the geometry dropdown after link sync
                 if self._geometry_dropdown:
-                    geometries = self.geometry_store.get_geometries_for_link(
-                        self.current_link
-                    )
+                    geometries = self.geometry_store.get_geometries_for_link(self.current_link)
                     if geometries:
-                        options = [
-                            f"{g.geometry_type.title()} {g.id}" for g in geometries
-                        ]
+                        options = [f"{g.geometry_type.title()} {g.id}" for g in geometries]
                         self._geometry_dropdown.options = options
                     self._sync_geometry_selection()
             else:
@@ -834,10 +754,7 @@ class BubblifyApp:
 
     def _update_transform_control(self):
         """Update transform control for the currently selected geometry."""
-        if (
-            self.current_geometry_id is not None
-            and self.current_geometry_id in self.geometry_store.by_id
-        ):
+        if self.current_geometry_id is not None and self.current_geometry_id in self.geometry_store.by_id:
             geometry = self.geometry_store.by_id[self.current_geometry_id]
 
             # Remove existing transform control
@@ -856,11 +773,7 @@ class BubblifyApp:
                     scale=0.7,
                     disable_rotations=disable_rotations,
                     position=geometry.local_xyz,
-                    wxyz=(
-                        geometry.local_wxyz
-                        if not disable_rotations
-                        else (1.0, 0.0, 0.0, 0.0)
-                    ),
+                    wxyz=(geometry.local_wxyz if not disable_rotations else (1.0, 0.0, 0.0, 0.0)),
                     depth_test=True,  # 主控制器保持深度测试
                     opacity=1.0,  # 主控制器保持完全不透明
                 )
@@ -868,22 +781,13 @@ class BubblifyApp:
                 # Set up callback for transform updates
                 @self.transform_control.on_update
                 def _(_):
-                    if (
-                        self.current_geometry_id is not None
-                        and self.current_geometry_id in self.geometry_store.by_id
-                    ):
-                        current_geometry = self.geometry_store.by_id[
-                            self.current_geometry_id
-                        ]
+                    if self.current_geometry_id is not None and self.current_geometry_id in self.geometry_store.by_id:
+                        current_geometry = self.geometry_store.by_id[self.current_geometry_id]
                         # Update position
-                        current_geometry.local_xyz = tuple(
-                            self.transform_control.position
-                        )
+                        current_geometry.local_xyz = tuple(self.transform_control.position)
                         # Update rotation only for non-sphere geometries
                         if current_geometry.geometry_type != "sphere":
-                            current_geometry.update_rpy_from_quaternion(
-                                tuple(self.transform_control.wxyz)
-                            )
+                            current_geometry.update_rpy_from_quaternion(tuple(self.transform_control.wxyz))
                         self._update_geometry_visualization(current_geometry)
                         self._update_radius_gizmo()
                         self._update_box_resize_gizmos()
@@ -945,10 +849,7 @@ class BubblifyApp:
         # Remove any previous gizmos
         self._remove_cylinder_height_gizmos()
 
-        if (
-            self.current_geometry_id is None
-            or self.current_geometry_id not in self.geometry_store.by_id
-        ):
+        if self.current_geometry_id is None or self.current_geometry_id not in self.geometry_store.by_id:
             return
 
         geometry = self.geometry_store.by_id[self.current_geometry_id]
@@ -961,7 +862,6 @@ class BubblifyApp:
         if parent_frame is None:
             return
 
-        import math
         import numpy as np
         from viser import transforms as tf
 
@@ -980,8 +880,6 @@ class BubblifyApp:
             cylinder_rotation = tf.SO3.identity()
 
         # Create gizmo for Z-axis (height adjustment) - 只创建负方向的gizmo
-        # 计算translation_limits: gizmo最多能向中心移动到距离中心0.005的位置
-        max_inward_movement = -(cylinder_height / 2 - 0.005)  # 负值表示向中心移动
 
         axis_info = {
             "name": "z_neg",
@@ -1021,9 +919,7 @@ class BubblifyApp:
             print(f"Error computing cylinder gizmo rotation: {e}")
             gizmo_rotation = axis_info["base_rotation"]
 
-        gizmo_name = (
-            f"{parent_frame.name}/cylinder_height_{geometry.id}_{axis_info['name']}"
-        )
+        gizmo_name = f"{parent_frame.name}/cylinder_height_{geometry.id}_{axis_info['name']}"
 
         # 获取translation_limits参数
         translation_limits = axis_info.get(
@@ -1049,19 +945,14 @@ class BubblifyApp:
         self.cylinder_height_gizmos[axis_info["name"]] = gizmo
 
         # Create callback for this specific gizmo
-        self._setup_cylinder_height_callback(
-            gizmo, axis_info["name"], axis_info["axis"]
-        )
+        self._setup_cylinder_height_callback(gizmo, axis_info["name"], axis_info["axis"])
 
     def _setup_cylinder_height_callback(self, gizmo, axis_name, axis_direction):
         """Setup callback for a specific cylinder height gizmo."""
 
         @gizmo.on_update
         def _(_):
-            if (
-                self.current_geometry_id is None
-                or self.current_geometry_id not in self.geometry_store.by_id
-            ):
+            if self.current_geometry_id is None or self.current_geometry_id not in self.geometry_store.by_id:
                 return
 
             geometry = self.geometry_store.by_id[self.current_geometry_id]
@@ -1085,9 +976,7 @@ class BubblifyApp:
                     wxyz = np.array(wxyz)
                 cylinder_rotation = tf.SO3(wxyz)
                 # 计算逆旋转，用于将世界坐标转换回cylinder局部坐标
-                cylinder_rotation_inv = tf.SO3.from_matrix(
-                    np.linalg.inv(cylinder_rotation.as_matrix())
-                )
+                cylinder_rotation_inv = tf.SO3.from_matrix(np.linalg.inv(cylinder_rotation.as_matrix()))
             except Exception as e:
                 print(f"Error computing cylinder rotation: {e}")
                 cylinder_rotation = tf.SO3.identity()
@@ -1123,10 +1012,7 @@ class BubblifyApp:
         # Remove any previous gizmo
         self._remove_radius_gizmo()
 
-        if (
-            self.current_geometry_id is None
-            or self.current_geometry_id not in self.geometry_store.by_id
-        ):
+        if self.current_geometry_id is None or self.current_geometry_id not in self.geometry_store.by_id:
             return
 
         s = self.geometry_store.by_id[self.current_geometry_id]
@@ -1140,7 +1026,6 @@ class BubblifyApp:
             return
 
         # Position gizmo at 135 degrees around Z-axis for better visibility
-        import math
         import numpy as np
         from viser import transforms as tf
 
@@ -1158,10 +1043,8 @@ class BubblifyApp:
         if s.geometry_type == "sphere":
             # For spheres, use simple 135-degree positioning (no rotation consideration needed)
             gizmo_pos = (
-                s.local_xyz[0]
-                + current_radius * math.cos(angle),  # X component at 135°
-                s.local_xyz[1]
-                + current_radius * math.sin(angle),  # Y component at 135°
+                s.local_xyz[0] + current_radius * math.cos(angle),  # X component at 135°
+                s.local_xyz[1] + current_radius * math.sin(angle),  # Y component at 135°
                 s.local_xyz[2],  # Same Z as center
             )
             # Simple 135-degree rotation for sphere
@@ -1209,10 +1092,6 @@ class BubblifyApp:
 
         gizmo_name = f"{parent_frame.name}/radius_gizmo_{s.id}"
 
-        # Calculate translation limits to prevent gizmo from going through center
-        # The gizmo can move inward until it's 0.005 units from the center
-        max_inward_movement = -(current_radius - 0.005)  # 负值表示向中心移动
-
         # Create a single-axis gizmo that allows bidirectional movement but prevents going through center
         self.radius_gizmo = self.server.scene.add_transform_controls(
             gizmo_name,
@@ -1252,11 +1131,7 @@ class BubblifyApp:
                 gizmo_pos_current[1] - s2.local_xyz[1],
                 gizmo_pos_current[2] - s2.local_xyz[2],
             )
-            new_radius = math.sqrt(
-                center_to_gizmo[0] ** 2
-                + center_to_gizmo[1] ** 2
-                + center_to_gizmo[2] ** 2
-            )
+            new_radius = math.sqrt(center_to_gizmo[0] ** 2 + center_to_gizmo[1] ** 2 + center_to_gizmo[2] ** 2)
             new_radius = max(0.005, new_radius)  # Minimum radius to avoid zero
 
             # Update radius based on geometry type
@@ -1286,10 +1161,7 @@ class BubblifyApp:
         # Remove any previous gizmos
         self._remove_box_resize_gizmos()
 
-        if (
-            self.current_geometry_id is None
-            or self.current_geometry_id not in self.geometry_store.by_id
-        ):
+        if self.current_geometry_id is None or self.current_geometry_id not in self.geometry_store.by_id:
             return
 
         geometry = self.geometry_store.by_id[self.current_geometry_id]
@@ -1302,7 +1174,6 @@ class BubblifyApp:
         if parent_frame is None:
             return
 
-        import math
         import numpy as np
         from viser import transforms as tf
 
@@ -1326,13 +1197,9 @@ class BubblifyApp:
                 "name": "x_neg",
                 "axis": (-1, 0, 0),
                 "color": (200, 80, 80),
-                "local_position": np.array(
-                    [-length / 2, 0, 0]
-                ),  # box本地坐标系中的位置
+                "local_position": np.array([-length / 2, 0, 0]),  # box本地坐标系中的位置
                 "active_axes": (True, False, False),  # 只允许X轴移动
-                "base_rotation": tf.SO3.from_y_radians(
-                    math.pi
-                ),  # 基础旋转：箭头指向相反方向
+                "base_rotation": tf.SO3.from_y_radians(math.pi),  # 基础旋转：箭头指向相反方向
                 "translation_limits": (
                     (-0.05, 10.0),  # X轴：能向中心移动但不穿过，能向外无限移动
                     (-10.0, 10.0),  # Y轴无限制
@@ -1345,9 +1212,7 @@ class BubblifyApp:
                 "color": (80, 200, 80),
                 "local_position": np.array([0, -width / 2, 0]),  # box本地坐标系中的位置
                 "active_axes": (False, True, False),  # 只允许Y轴移动
-                "base_rotation": tf.SO3.from_x_radians(
-                    math.pi
-                ),  # 基础旋转：箭头指向相反方向
+                "base_rotation": tf.SO3.from_x_radians(math.pi),  # 基础旋转：箭头指向相反方向
                 "translation_limits": (
                     (-10.0, 10.0),  # X轴无限制
                     (-0.05, 10.0),  # Y轴：能向中心移动但不穿过，能向外无限移动
@@ -1358,13 +1223,9 @@ class BubblifyApp:
                 "name": "z_neg",
                 "axis": (0, 0, -1),
                 "color": (80, 80, 200),
-                "local_position": np.array(
-                    [0, 0, -height / 2]
-                ),  # box本地坐标系中的位置
+                "local_position": np.array([0, 0, -height / 2]),  # box本地坐标系中的位置
                 "active_axes": (False, False, True),  # 只允许Z轴移动
-                "base_rotation": tf.SO3.from_x_radians(
-                    math.pi
-                ),  # 修复：使用base_rotation并绕X轴旋转
+                "base_rotation": tf.SO3.from_x_radians(math.pi),  # 修复：使用base_rotation并绕X轴旋转
                 "translation_limits": (
                     (-10.0, 10.0),  # X轴无限制
                     (-10.0, 10.0),  # Y轴无限制
@@ -1396,9 +1257,7 @@ class BubblifyApp:
                 print(f"Error computing gizmo rotation: {e}")
                 gizmo_rotation = axis_info["base_rotation"]
 
-            gizmo_name = (
-                f"{parent_frame.name}/box_resize_{geometry.id}_{axis_info['name']}"
-            )
+            gizmo_name = f"{parent_frame.name}/box_resize_{geometry.id}_{axis_info['name']}"
 
             # 获取translation_limits参数
             translation_limits = axis_info.get(
@@ -1431,10 +1290,7 @@ class BubblifyApp:
 
         @gizmo.on_update
         def _(_):
-            if (
-                self.current_geometry_id is None
-                or self.current_geometry_id not in self.geometry_store.by_id
-            ):
+            if self.current_geometry_id is None or self.current_geometry_id not in self.geometry_store.by_id:
                 return
 
             geometry = self.geometry_store.by_id[self.current_geometry_id]
@@ -1446,7 +1302,6 @@ class BubblifyApp:
             # Get current gizmo position
             gizmo_pos = gizmo.position
             center = geometry.local_xyz
-            old_size = geometry.size
 
             # 计算考虑旋转的新尺寸
             import numpy as np
@@ -1459,9 +1314,7 @@ class BubblifyApp:
                     wxyz = np.array(wxyz)
                 box_rotation = tf.SO3(wxyz)
                 # 计算逆旋转，用于将世界坐标转换回box局部坐标
-                box_rotation_inv = tf.SO3.from_matrix(
-                    np.linalg.inv(box_rotation.as_matrix())
-                )
+                box_rotation_inv = tf.SO3.from_matrix(np.linalg.inv(box_rotation.as_matrix()))
             except Exception as e:
                 print(f"Error computing box rotation: {e}")
                 box_rotation = tf.SO3.identity()
@@ -1515,7 +1368,6 @@ class BubblifyApp:
         if geometry.geometry_type != "box":
             return
 
-        import math
         import numpy as np
         from viser import transforms as tf
 
@@ -1560,10 +1412,7 @@ class BubblifyApp:
         # Set flag to prevent recursive updates
         self._updating_geometry_ui = True
 
-        if (
-            self.current_geometry_id is not None
-            and self.current_geometry_id in self.geometry_store.by_id
-        ):
+        if self.current_geometry_id is not None and self.current_geometry_id in self.geometry_store.by_id:
             geometry = self.geometry_store.by_id[self.current_geometry_id]
 
             # Update properties based on geometry type
@@ -1581,9 +1430,7 @@ class BubblifyApp:
                 if self._cylinder_height_slider:
                     self._cylinder_height_slider.value = geometry.cylinder_height
                 if self._cylinder_as_capsule_checkbox:
-                    self._cylinder_as_capsule_checkbox.value = (
-                        geometry.display_as_capsule
-                    )
+                    self._cylinder_as_capsule_checkbox.value = geometry.display_as_capsule
 
             # Update color input
             if self._geometry_color_input:
@@ -1636,10 +1483,7 @@ class BubblifyApp:
     def _sync_link_selection(self):
         """Sync link selection between visibility controls and geometry editor."""
         # Sync visibility dropdown if different
-        if (
-            self._current_link_dropdown
-            and self._current_link_dropdown.value != self.current_link
-        ):
+        if self._current_link_dropdown and self._current_link_dropdown.value != self.current_link:
             self._current_link_dropdown.value = self.current_link
         # Sync geometry editor dropdown if different
         if self._link_dropdown and self._link_dropdown.value != self.current_link:
@@ -1768,11 +1612,9 @@ class BubblifyApp:
         """Add a reference grid to the scene."""
         # Get scene bounds to position grid appropriately
         try:
-            trimesh_scene = (
-                self.urdf_viz._urdf.scene or self.urdf_viz._urdf.collision_scene
-            )
+            trimesh_scene = self.urdf_viz._urdf.scene or self.urdf_viz._urdf.collision_scene
             z_pos = trimesh_scene.bounds[0, 2] if trimesh_scene is not None else 0.0
-        except:
+        except Exception:
             z_pos = 0.0
 
         self.server.scene.add_grid(
