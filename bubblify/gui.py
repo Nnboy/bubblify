@@ -17,7 +17,6 @@ from .core import (
     Geometry,
     GeometryStore,
     inject_geometries_into_urdf_xml,
-    inject_geometries_into_urdf_xml,
 )
 
 
