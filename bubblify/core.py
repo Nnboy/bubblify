@@ -131,10 +131,6 @@ def quaternion_to_rpy(
     return (roll, pitch, yaw)
 
 
-# For backward compatibility
-Sphere = Geometry
-
-
 class GeometryStore:
     """Manages collection of collision geometries and their relationships to URDF links."""
 
@@ -218,15 +214,6 @@ class GeometryStore:
         """Remove all geometries."""
         for geometry in list(self.by_id.values()):
             self.remove(geometry.id)
-
-    # Backward compatibility methods
-    def get_spheres_for_link(self, link: str) -> List[Geometry]:
-        """Get all geometries attached to a specific link (backward compatibility)."""
-        return self.get_geometries_for_link(link)
-
-
-# For backward compatibility
-SphereStore = GeometryStore
 
 
 class EnhancedViserUrdf:
