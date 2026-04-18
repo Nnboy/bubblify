@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Optional
 
 from .gui import BubblifyApp
 
@@ -24,9 +23,7 @@ Examples:
         """,
     )
 
-    parser.add_argument(
-        "--urdf_path", type=Path, required=True, help="Path to URDF file (required)"
-    )
+    parser.add_argument("--urdf_path", type=Path, required=True, help="Path to URDF file (required)")
 
     parser.add_argument(
         "--geometry_config",
@@ -34,9 +31,7 @@ Examples:
         help="Path to existing geometry configuration YAML file to load (optional)",
     )
 
-    parser.add_argument(
-        "--port", type=int, default=8080, help="Viser server port (default: 8080)"
-    )
+    parser.add_argument("--port", type=int, default=8080, help="Viser server port (default: 8080)")
 
     parser.add_argument(
         "--show_collision",
@@ -52,9 +47,7 @@ Examples:
         sys.exit(1)
 
     if args.geometry_config is not None and not args.geometry_config.exists():
-        print(
-            f"❌ Error: Geometry configuration YAML file not found: {args.geometry_config}"
-        )
+        print(f"❌ Error: Geometry configuration YAML file not found: {args.geometry_config}")
         sys.exit(1)
 
     # Welcome message

@@ -7,7 +7,7 @@ import itertools
 import warnings
 from functools import partial
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Literal
+from typing import Any, Dict, List, Literal, Optional, Tuple
 from xml.etree import ElementTree as ET
 
 import numpy as np
@@ -15,11 +15,52 @@ import trimesh
 import viser
 import yourdfpy
 from trimesh.scene import Scene
-
 from viser import transforms as tf
+
 
 # Type definitions for geometry types
 GeometryType = Literal["sphere", "box", "cylinder"]
+
+YAML_SCHEMA_VERSION = 1
+
+
+@dataclasses.dataclass
+class GeometrySpec:
+    """YAML 解析后的一条几何配置，尚未分配 id / 挂接 viser node。
+
+    Used on the load path: YAML -> List[GeometrySpec] -> caller turns each
+    spec into a Geometry via store.add(spec.link, **spec.to_store_kwargs())
+    and builds the viser visualization.
+
+    Note: Geometry.display_as_capsule is not serialized (runtime-only
+    display state), so GeometrySpec does not carry that field.
+    """
+
+    link: str
+    xyz: Tuple[float, float, float]
+    geometry_type: GeometryType
+    rpy: Tuple[float, float, float] = (0.0, 0.0, 0.0)
+    radius: Optional[float] = None
+    size: Optional[Tuple[float, float, float]] = None
+    cylinder_radius: Optional[float] = None
+    cylinder_height: Optional[float] = None
+
+    def to_store_kwargs(self) -> Dict[str, Any]:
+        """Return kwargs suitable for GeometryStore.add (None values omitted)."""
+        kwargs: Dict[str, Any] = {
+            "xyz": self.xyz,
+            "geometry_type": self.geometry_type,
+            "rpy": self.rpy,
+        }
+        if self.radius is not None:
+            kwargs["radius"] = self.radius
+        if self.size is not None:
+            kwargs["size"] = self.size
+        if self.cylinder_radius is not None:
+            kwargs["cylinder_radius"] = self.cylinder_radius
+        if self.cylinder_height is not None:
+            kwargs["cylinder_height"] = self.cylinder_height
+        return kwargs
 
 
 @dataclasses.dataclass
@@ -65,9 +106,7 @@ class Geometry:
             return self.radius
         elif self.geometry_type == "box":
             # Use half the diagonal of the box as effective radius
-            return 0.5 * np.sqrt(
-                self.size[0] ** 2 + self.size[1] ** 2 + self.size[2] ** 2
-            )
+            return 0.5 * np.sqrt(self.size[0] ** 2 + self.size[1] ** 2 + self.size[2] ** 2)
         elif self.geometry_type == "cylinder":
             return self.cylinder_radius
         return self.radius
@@ -133,10 +172,6 @@ def quaternion_to_rpy(
     return (roll, pitch, yaw)
 
 
-# For backward compatibility
-Sphere = Geometry
-
-
 class GeometryStore:
     """Manages collection of collision geometries and their relationships to URDF links."""
 
@@ -144,9 +179,7 @@ class GeometryStore:
         self._next_id = itertools.count(0)
         self.by_id: Dict[int, Geometry] = {}
         self.ids_by_link: Dict[str, List[int]] = {}
-        self.group_nodes: Dict[str, viser.FrameHandle] = (
-            {}
-        )  # /geometries/<link> parents
+        self.group_nodes: Dict[str, viser.FrameHandle] = {}  # /geometries/<link> parents
 
     def add(
         self,
@@ -223,15 +256,6 @@ class GeometryStore:
         for geometry in list(self.by_id.values()):
             self.remove(geometry.id)
 
-    # Backward compatibility methods
-    def get_spheres_for_link(self, link: str) -> List[Geometry]:
-        """Get all geometries attached to a specific link (backward compatibility)."""
-        return self.get_geometries_for_link(link)
-
-
-# For backward compatibility
-SphereStore = GeometryStore
-
 
 class EnhancedViserUrdf:
     """Enhanced URDF visualizer with per-link control capabilities.
@@ -248,12 +272,8 @@ class EnhancedViserUrdf:
         urdf_or_path: yourdfpy.URDF | Path,
         scale: float = 1.0,
         root_node_name: str = "/",
-        mesh_color_override: (
-            Tuple[float, float, float] | Tuple[float, float, float, float] | None
-        ) = None,
-        collision_mesh_color_override: (
-            Tuple[float, float, float] | Tuple[float, float, float, float] | None
-        ) = None,
+        mesh_color_override: (Tuple[float, float, float] | Tuple[float, float, float, float] | None) = None,
+        collision_mesh_color_override: (Tuple[float, float, float] | Tuple[float, float, float, float] | None) = None,
         load_meshes: bool = True,
         load_collision_meshes: bool = False,
     ) -> None:
@@ -355,17 +375,12 @@ class EnhancedViserUrdf:
         if self._visual_root_frame is not None:
             self._visual_root_frame.visible = visible
         else:
-            warnings.warn(
-                "Cannot set `.show_visual`, since no visual meshes were loaded."
-            )
+            warnings.warn("Cannot set `.show_visual`, since no visual meshes were loaded.")
 
     @property
     def show_collision(self) -> bool:
         """Returns whether the collision meshes are currently visible."""
-        return (
-            self._collision_root_frame is not None
-            and self._collision_root_frame.visible
-        )
+        return self._collision_root_frame is not None and self._collision_root_frame.visible
 
     @show_collision.setter
     def show_collision(self, visible: bool) -> None:
@@ -373,9 +388,7 @@ class EnhancedViserUrdf:
         if self._collision_root_frame is not None:
             self._collision_root_frame.visible = visible
         else:
-            warnings.warn(
-                "Cannot set `.show_collision`, since no collision meshes were loaded."
-            )
+            warnings.warn("Cannot set `.show_collision`, since no collision meshes were loaded.")
 
     def set_link_visible(self, link_name: str, visible: bool, which: str = "visual"):
         """Set visibility of a specific link's meshes."""
@@ -398,18 +411,14 @@ class EnhancedViserUrdf:
         self._urdf.update_cfg(configuration)
         for joint, frame_handle in zip(self._joint_map_values, self._joint_frames):
             assert isinstance(joint, yourdfpy.Joint)
-            T_parent_child = self._urdf.get_transform(
-                joint.child, joint.parent, collision_geometry=not self._load_meshes
-            )
+            T_parent_child = self._urdf.get_transform(joint.child, joint.parent, collision_geometry=not self._load_meshes)
             frame_handle.wxyz = tf.SO3.from_matrix(T_parent_child[:3, :3]).wxyz
             frame_handle.position = T_parent_child[:3, 3] * self._scale
 
     def get_actuated_joint_limits(self) -> dict[str, tuple[float | None, float | None]]:
         """Returns an ordered mapping from actuated joint names to position limits."""
         out: dict[str, tuple[float | None, float | None]] = {}
-        for joint_name, joint in zip(
-            self._urdf.actuated_joint_names, self._urdf.actuated_joints
-        ):
+        for joint_name, joint in zip(self._urdf.actuated_joint_names, self._urdf.actuated_joints):
             assert isinstance(joint_name, str)
             assert isinstance(joint, yourdfpy.Joint)
             if joint.limit is None:
@@ -431,16 +440,12 @@ class EnhancedViserUrdf:
         scene: Scene,
         root_node_name: str,
         collision_geometry: bool,
-        mesh_color_override: (
-            Tuple[float, float, float] | Tuple[float, float, float, float] | None
-        ),
+        mesh_color_override: (Tuple[float, float, float] | Tuple[float, float, float, float] | None),
     ) -> viser.FrameHandle:
         """Helper function to add joint frames and meshes to the ViserUrdf object."""
         prefix = "collision" if collision_geometry else "visual"
         prefixed_root_node_name = (f"{root_node_name}/{prefix}").replace("//", "/")
-        root_frame = self._target.scene.add_frame(
-            prefixed_root_node_name, show_axes=False
-        )
+        root_frame = self._target.scene.add_frame(prefixed_root_node_name, show_axes=False)
 
         # Add coordinate frame for each joint.
         for joint in self._urdf.joint_map.values():
@@ -520,9 +525,7 @@ def _viser_name_from_frame(
     return "/".join(frames[::-1])
 
 
-def inject_geometries_into_urdf_xml(
-    original_urdf_path: Optional[Path], urdf_obj: yourdfpy.URDF, store: GeometryStore
-) -> str:
+def inject_geometries_into_urdf_xml(original_urdf_path: Optional[Path], urdf_obj: yourdfpy.URDF, store: GeometryStore) -> str:
     """Inject collision geometries into URDF XML, replacing all existing collision elements."""
     if original_urdf_path is not None:
         root = ET.parse(original_urdf_path).getroot()
@@ -558,7 +561,7 @@ def inject_geometries_into_urdf_xml(
                 rpy_str = "0 0 0"
             else:
                 rpy_str = f"{geometry.local_rpy[0]} {geometry.local_rpy[1]} {geometry.local_rpy[2]}"
-            origin = ET.SubElement(
+            ET.SubElement(
                 coll,
                 "origin",
                 {
@@ -606,3 +609,136 @@ def inject_geometries_into_urdf_xml(
     # Add XML declaration and return
     xml_content = ET.tostring(root, encoding="unicode")
     return '<?xml version="1.0" encoding="utf-8"?>\n' + xml_content
+
+
+def load_geometry_specs_from_yaml(path: Path) -> List[GeometrySpec]:
+    """Read a YAML file and return a list of GeometrySpec.
+
+    Only the new format (top-level `collision_geometries` key) is accepted.
+
+    Raises:
+        FileNotFoundError: file does not exist
+        ValueError: missing `collision_geometries`, missing required fields,
+                    or unknown `type`
+    """
+    import yaml
+
+    if not path.exists():
+        raise FileNotFoundError(f"YAML file not found: {path}")
+
+    data = yaml.safe_load(path.read_text()) or {}
+    if "collision_geometries" not in data:
+        raise ValueError(f"YAML missing required top-level key 'collision_geometries': {path}")
+
+    specs: List[GeometrySpec] = []
+    for link_name, entries in (data["collision_geometries"] or {}).items():
+        for entry in entries or []:
+            specs.append(_parse_geometry_entry(link_name, entry))
+    return specs
+
+
+def _parse_geometry_entry(link: str, entry: Dict[str, Any]) -> GeometrySpec:
+    """Parse a single YAML entry under collision_geometries into GeometrySpec."""
+    if "center" not in entry:
+        raise ValueError(f"link={link}: entry missing 'center'")
+    if "type" not in entry:
+        raise ValueError(f"link={link}: entry missing 'type'")
+
+    geom_type = entry["type"]
+    if geom_type not in ("sphere", "box", "cylinder"):
+        raise ValueError(f"link={link}: unknown geometry type '{geom_type}'")
+
+    xyz = tuple(entry["center"])
+    rpy = tuple(entry.get("rpy", [0.0, 0.0, 0.0]))
+
+    if geom_type == "sphere":
+        if "radius" not in entry:
+            raise ValueError(f"link={link}: sphere entry missing 'radius'")
+        return GeometrySpec(
+            link=link,
+            xyz=xyz,
+            geometry_type="sphere",
+            rpy=rpy,
+            radius=float(entry["radius"]),
+        )
+    if geom_type == "box":
+        if "size" not in entry:
+            raise ValueError(f"link={link}: box entry missing 'size'")
+        return GeometrySpec(
+            link=link,
+            xyz=xyz,
+            geometry_type="box",
+            rpy=rpy,
+            size=tuple(entry["size"]),
+        )
+    # cylinder
+    if "radius" not in entry or "height" not in entry:
+        raise ValueError(f"link={link}: cylinder entry missing 'radius' or 'height'")
+    return GeometrySpec(
+        link=link,
+        xyz=xyz,
+        geometry_type="cylinder",
+        rpy=rpy,
+        cylinder_radius=float(entry["radius"]),
+        cylinder_height=float(entry["height"]),
+    )
+
+
+def dump_geometries_to_yaml(
+    store: "GeometryStore",
+    path: Path,
+    *,
+    include_metadata: bool = True,
+) -> None:
+    """Serialize a GeometryStore to YAML.
+
+    Writes only the new-format `collision_geometries` key plus optional
+    metadata. Old-format files that used only a legacy mirror key are no
+    longer supported; re-export through the GUI to upgrade.
+    """
+    import time
+
+    import yaml
+
+    collision_geometries: Dict[str, List[Dict[str, Any]]] = {}
+    for geometry in store.by_id.values():
+        collision_geometries.setdefault(geometry.link, []).append(_geometry_to_yaml_entry(geometry))
+
+    data: Dict[str, Any] = {
+        "collision_geometries": collision_geometries,
+    }
+
+    if include_metadata:
+        data["metadata"] = {
+            "total_geometries": int(len(store.by_id)),
+            "links": list(collision_geometries.keys()),
+            "export_timestamp": float(time.time()),
+            "schema_version": YAML_SCHEMA_VERSION,
+        }
+
+    path.write_text(yaml.dump(data, default_flow_style=False, sort_keys=False))
+
+
+def _geometry_to_yaml_entry(geometry: Geometry) -> Dict[str, Any]:
+    """Convert a single Geometry to a YAML entry dict."""
+    center = geometry.local_xyz
+    if hasattr(center, "tolist"):
+        center = center.tolist()
+    else:
+        center = [float(x) for x in center]
+
+    entry: Dict[str, Any] = {
+        "center": center,
+        "type": geometry.geometry_type,
+    }
+    if geometry.geometry_type != "sphere":
+        entry["rpy"] = [float(r) for r in geometry.local_rpy]
+
+    if geometry.geometry_type == "sphere":
+        entry["radius"] = float(geometry.radius)
+    elif geometry.geometry_type == "box":
+        entry["size"] = [float(s) for s in geometry.size]
+    elif geometry.geometry_type == "cylinder":
+        entry["radius"] = float(geometry.cylinder_radius)
+        entry["height"] = float(geometry.cylinder_height)
+    return entry
