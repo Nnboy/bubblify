@@ -716,6 +716,7 @@ class BubblifyApp:
                 self.transform_control = self.server.scene.add_transform_controls(
                     control_name,
                     scale=0.7,
+                    fixed=True,  # 保持屏幕空间固定大小，不随相机距离缩放
                     disable_rotations=disable_rotations,
                     position=geometry.local_xyz,
                     wxyz=(geometry.local_wxyz if not disable_rotations else (1.0, 0.0, 0.0, 0.0)),
@@ -875,6 +876,7 @@ class BubblifyApp:
         gizmo = self.server.scene.add_transform_controls(
             gizmo_name,
             scale=0.2,
+            fixed=True,  # 保持屏幕空间固定大小
             line_width=15.0,  # 稍细一些，区别于box的gizmo
             active_axes=axis_info["active_axes"],
             disable_sliders=True,
@@ -1041,6 +1043,7 @@ class BubblifyApp:
         self.radius_gizmo = self.server.scene.add_transform_controls(
             gizmo_name,
             scale=0.4,  # Reduce size to be less prominent
+            fixed=True,  # 保持屏幕空间固定大小
             active_axes=(True, False, False),  # Only X axis active (but now rotated)
             disable_sliders=True,
             disable_rotations=True,
@@ -1213,6 +1216,7 @@ class BubblifyApp:
             gizmo = self.server.scene.add_transform_controls(
                 gizmo_name,
                 scale=0.2,
+                fixed=True,  # 保持屏幕空间固定大小
                 line_width=20.0,
                 active_axes=axis_info["active_axes"],
                 disable_sliders=True,
